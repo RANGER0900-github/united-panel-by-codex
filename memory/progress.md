@@ -41,19 +41,19 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P3.8 — Wire create VPS wizard/modal
 [x] P3.9 — Wire VPS detail page
 [x] P3.10 — Build and verify
-[ ] T01 — /api/health
-[ ] T02 — login returns JWT
-[ ] T03 — login failure
-[ ] T04 — /api/vps without token
-[ ] T05 — /api/vps with token
-[ ] T06 — /api/drivers
-[ ] T07 — /api/images
-[ ] T08 — /api/storage
-[ ] T09 — /api/host metrics
-[ ] T10 — create VPS
-[ ] T11 — verify RUNNING
-[ ] T12 — stop VPS
-[ ] T13 — start VPS
-[ ] T14 — delete VPS
-[ ] T15 — validation errors
-[ ] T16 — rate limit
+[x] T01 — /api/health
+[x] T02 — login returns JWT
+[x] T03 — login failure
+[x] T04 — /api/vps without token
+[x] T05 — /api/vps with token
+[x] T06 — /api/drivers
+[x] T07 — /api/images
+[x] T08 — /api/storage
+[x] T09 — /api/host metrics
+[x] T10 — create VPS
+[x] T11 — verify RUNNING
+[x] T12 — stop VPS
+[x] T13 — start VPS
+[x] T14 — delete VPS
+[x] T15 — validation errors
+[x] T16 — rate limit
