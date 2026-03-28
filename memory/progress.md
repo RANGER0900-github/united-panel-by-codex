@@ -32,7 +32,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P2.26 — server/index.js
 [x] P2.27 — Smoke test
 [x] P3.1 — Install frontend dependencies
-[ ] P3.2 — Create API client
+[x] P3.2 — Create API client
 [ ] P3.3 — Create .env files
 [ ] P3.4 — Wire auth
 [ ] P3.5 — Wire dashboard metrics
