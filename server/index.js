@@ -60,7 +60,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 io.use((socket, next) => {
-  const token = socket.handshake.query?.token;
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
   if (!token) return next(new Error("Unauthorized"));
   try {
     const decoded = jwt.verify(token, config.jwt_secret);
