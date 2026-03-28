@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LayoutDashboard, Server, Cpu, TerminalSquare, Code, Activity, ShieldCheck } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { clearToken } from "@/api/client";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,7 +19,12 @@ const NAV_ITEMS = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+
+  const handleLogout = () => {
+    clearToken();
+    setLocation("/login");
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background relative">
@@ -86,6 +92,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground font-mono mt-0.5">PING: 14ms</p>
             </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="mt-4 w-full py-2 rounded-lg text-xs uppercase tracking-widest border border-white/10 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:shadow-[0_0_10px_rgba(0,212,255,0.2)] transition-all"
+          >
+            Logout
+          </button>
         </div>
       </motion.aside>
 

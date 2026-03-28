@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +9,9 @@ import Host from "@/pages/host";
 import Logs from "@/pages/logs";
 import Installer from "@/pages/installer";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+import { getToken } from "@/api/client";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +23,18 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (location !== "/login" && !getToken()) {
+      setLocation("/login");
+    }
+  }, [location, setLocation]);
+
+  if (location === "/login") {
+    return <Login />;
+  }
+
   return (
     <Layout>
       <Switch>
