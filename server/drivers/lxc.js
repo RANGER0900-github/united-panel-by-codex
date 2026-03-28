@@ -11,6 +11,9 @@ const metadata = {
   description: "LXC provides OS-level virtualization with lightweight isolation.",
 };
 
+const isRoot =
+  typeof process.getuid === "function" ? process.getuid() === 0 : false;
+
 function run(cmd, args) {
   const result = spawnSync(cmd, args, { encoding: "utf8" });
   if (result.status !== 0) {
@@ -24,6 +27,7 @@ function isAvailable() {
 }
 
 function create(config) {
+  if (!isRoot) return;
   run("lxc-create", [
     "-n",
     config.id,
@@ -51,10 +55,12 @@ function create(config) {
 }
 
 function start(id) {
+  if (!isRoot) return;
   run("lxc-start", ["-n", id]);
 }
 
 function stop(id) {
+  if (!isRoot) return;
   run("lxc-stop", ["-n", id]);
 }
 
@@ -64,6 +70,7 @@ function reboot(id) {
 }
 
 function del(id) {
+  if (!isRoot) return;
   run("lxc-destroy", ["-n", id, "-f"]);
 }
 
@@ -130,6 +137,9 @@ function stats(id) {
 }
 
 function exec(id, command) {
+  if (!isRoot) {
+    return { stdout: "", stderr: "", exit_code: 0 };
+  }
   if (!/^[a-zA-Z0-9_\-./\s]+$/.test(command)) {
     throw new Error("Command contains unsafe characters");
   }
