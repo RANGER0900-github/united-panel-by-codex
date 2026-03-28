@@ -46,6 +46,15 @@ function createVpsRouter(io, driverRegistry) {
     const imagePath = ensureImage(image);
     const now = Math.floor(Date.now() / 1000);
 
+    const existing = db
+      .prepare("SELECT id, status FROM vps_instances WHERE name = ?")
+      .get(name);
+    if (existing && existing.status === "DELETED") {
+      db.prepare("DELETE FROM vps_instances WHERE id = ?").run(existing.id);
+    } else if (existing) {
+      return res.status(400).json({ success: false, error: "Name already exists" });
+    }
+
     const record = {
       id,
       name,
