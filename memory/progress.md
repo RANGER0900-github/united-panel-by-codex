@@ -40,4 +40,4 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P3.7 — Technology selector component
 [x] P3.8 — Wire create VPS wizard/modal
 [x] P3.9 — Wire VPS detail page
-[ ] P3.10 — Build and verify
+[x] P3.10 — Build and verify

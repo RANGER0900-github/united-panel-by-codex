@@ -1,26 +1,23 @@
 import React, { useState } from "react";
 import { PageTransition } from "@/components/page-transition";
-import { useGetInstallerScript } from "@workspace/api-client-react";
 import { Terminal, Copy, Check, ShieldAlert, Cpu } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Installer() {
-  const { data, isLoading } = useGetInstallerScript();
   const [copied, setCopied] = useState(false);
+  const script = `curl -sSL ${window.location.origin}/install.sh | sudo bash`;
 
   const handleCopy = () => {
-    if (data?.script) {
-      navigator.clipboard.writeText(data.script);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    navigator.clipboard.writeText(script);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <PageTransition>
       <div className="max-w-4xl mx-auto space-y-8 pb-12">
         <header className="text-center space-y-4 mb-12">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,212,255,0.2)]"
@@ -35,7 +32,7 @@ export default function Installer() {
           </p>
         </header>
 
-        <motion.div 
+        <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
@@ -49,32 +46,26 @@ export default function Installer() {
             </div>
             <span className="text-xs font-mono text-muted-foreground">root@server:~</span>
           </div>
-          
+
           <div className="p-8 relative">
-            {isLoading ? (
-              <div className="h-12 w-full bg-white/5 animate-pulse rounded" />
-            ) : (
-              <>
-                <pre className="font-mono text-lg text-glow-cyan text-primary overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
-                  {data?.script || "curl -sSL https://nexus.vps/install.sh | sudo bash"}
-                </pre>
-                
-                <div className="mt-8 flex justify-end">
-                  <button 
-                    onClick={handleCopy}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wider hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(0,212,255,0.4)] hover:-translate-y-0.5 transition-all"
-                  >
-                    {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                    {copied ? 'Copied to Clipboard' : 'Copy Command'}
-                  </button>
-                </div>
-              </>
-            )}
+            <pre className="font-mono text-lg text-glow-cyan text-primary overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+              {script}
+            </pre>
+
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-wider hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(0,212,255,0.4)] hover:-translate-y-0.5 transition-all"
+              >
+                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                {copied ? "Copied to Clipboard" : "Copy Command"}
+              </button>
+            </div>
           </div>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -99,7 +90,7 @@ export default function Installer() {
             </ul>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -112,7 +103,7 @@ export default function Installer() {
               Running curl piped directly into bash executes the script immediately with root privileges. We recommend inspecting the script source before installation if you are deploying to a production environment.
             </p>
             <p className="text-xs font-mono text-destructive/80">
-              SHA256: {data?.checksum || 'Loading checksum...'}
+              SHA256: Inspect installer on host before execution.
             </p>
           </motion.div>
         </div>
