@@ -1,0 +1,7 @@
+{
+  "port": 3000,
+  "jwt_secret": "dev-secret-change-in-production",
+  "db_path": "./data/panel.db",
+  "data_dir": "./data",
+  "log_level": "debug"
+}
