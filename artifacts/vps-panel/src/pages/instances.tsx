@@ -42,6 +42,7 @@ export default function Instances() {
 
   useEffect(() => {
     fetchVps();
+    const interval = setInterval(fetchVps, 5000);
     const socket = connectSocket();
     socket.on("vps:update", (update: any) => {
       setVps((prev) => {
@@ -50,7 +51,10 @@ export default function Instances() {
         return prev.map((item) => (item.id === update.id ? { ...item, ...update } : item));
       });
     });
-    return () => socket.disconnect();
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
   }, []);
 
   const handleCreateSuccess = () => {
@@ -164,7 +168,7 @@ function VpsCard({ instance, onRefresh }: { instance: Vps; onRefresh: () => void
             <span className="truncate">{instance.image}</span>
           </div>
         </div>
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shrink-0 ml-2 ${statusBadge}`}>
+        <div data-status={instance.status} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shrink-0 ml-2 ${statusBadge}`}>
           {instance.status}
         </div>
       </div>
