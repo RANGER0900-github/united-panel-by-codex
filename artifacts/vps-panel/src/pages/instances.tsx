@@ -305,7 +305,7 @@ function CreateVpsForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <form className="px-6 pb-6 space-y-5" onSubmit={handleSubmit}>
+    <form className="px-6 pb-6 space-y-5 max-h-[70vh] overflow-y-auto pr-2" onSubmit={handleSubmit}>
       <div className="space-y-2">
         <label className="text-xs uppercase tracking-widest text-muted-foreground">Name</label>
         <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required />

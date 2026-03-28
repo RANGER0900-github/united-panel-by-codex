@@ -276,11 +276,12 @@ cd "$INSTALL_DIR"
 # ── SECTION 9: GENERATE CONFIG ───────────────────────────────
 log "Generating configuration..."
 mkdir -p "$INSTALL_DIR/config" "$INSTALL_DIR/data"
-
-JWT_SECRET=$(openssl rand -hex 32)
-ADMIN_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
-
-cat > "$INSTALL_DIR/config/config.json" << EOF
+ADMIN_PASS=""
+if [ -f "$INSTALL_DIR/config/config.json" ]; then
+  ok "Config exists; preserving existing config."
+else
+  JWT_SECRET=$(openssl rand -hex 32)
+  cat > "$INSTALL_DIR/config/config.json" << EOF
 {
   "port": 3000,
   "jwt_secret": "$JWT_SECRET",
@@ -289,10 +290,16 @@ cat > "$INSTALL_DIR/config/config.json" << EOF
   "log_level": "info"
 }
 EOF
-chmod 600 "$INSTALL_DIR/config/config.json"
+  chmod 600 "$INSTALL_DIR/config/config.json"
+fi
 
-echo "admin:$ADMIN_PASS" > "$INSTALL_DIR/config/credentials.txt"
-chmod 600 "$INSTALL_DIR/config/credentials.txt"
+if [ -f "$INSTALL_DIR/config/credentials.txt" ]; then
+  ADMIN_PASS=$(cut -d':' -f2 "$INSTALL_DIR/config/credentials.txt" | tr -d '\n')
+else
+  ADMIN_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
+  echo "admin:$ADMIN_PASS" > "$INSTALL_DIR/config/credentials.txt"
+  chmod 600 "$INSTALL_DIR/config/credentials.txt"
+fi
 ok "Config generated"
 
 # Sync admin credentials into database
@@ -428,3 +435,5 @@ if [ "$NETWORK_MODE" = "tunnel" ]; then
   echo "  cloudflared tunnel --url http://localhost:3000"
   echo ""
 fi
+echo "  Install/Upgrade (GitHub):"
+echo "  curl -fsSL https://raw.githubusercontent.com/RANGER0900-github/united-panel-by-codex/master/install.sh | sudo bash"

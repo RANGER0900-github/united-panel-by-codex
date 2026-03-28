@@ -11,6 +11,8 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [instances, setInstances] = useState<any[]>([]);
+  const [logVpsId, setLogVpsId] = useState<string>("");
+  const [recentLogs, setRecentLogs] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchHealth = async () => {
@@ -55,6 +57,30 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!logVpsId && instances.length > 0) {
+      setLogVpsId(instances[0].id);
+    }
+  }, [instances, logVpsId]);
+
+  useEffect(() => {
+    if (!logVpsId) {
+      setRecentLogs([]);
+      return;
+    }
+    const fetchLogs = async () => {
+      try {
+        const response = await api.get(`/api/vps/${logVpsId}/logs?lines=50`);
+        setRecentLogs(response.data?.data?.logs || []);
+      } catch (err) {
+        setRecentLogs([]);
+      }
+    };
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 10000);
+    return () => clearInterval(interval);
+  }, [logVpsId]);
+
+  useEffect(() => {
     const socket = connectSocket();
     socket.on("metrics", (data: any) => {
       setMetrics(data);
@@ -69,6 +95,14 @@ export default function Dashboard() {
     if (!history?.length) return [];
     return history.map(pt => ({
       ...pt,
+      cpuPercent: Number(pt.cpu_percent ?? 0),
+      memoryPercent: Math.min(
+        100,
+        Math.max(
+          0,
+          ((Number(pt.ram_used_mb ?? 0) / Math.max(Number(pt.ram_total_mb ?? 1), 1)) * 100),
+        ),
+      ),
       time: format(new Date(pt.timestamp), 'HH:mm')
     }));
   }, [history]);
@@ -186,6 +220,37 @@ export default function Dashboard() {
                     <p className="font-medium text-destructive text-sm">Health Degraded</p>
                     <p className="text-xs text-muted-foreground mt-1">Check logs for details.</p>
                   </div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Recent Logs</h4>
+                {instances.length > 0 && (
+                  <select
+                    className="bg-background/60 border border-white/10 text-xs rounded-md px-2 py-1 text-foreground"
+                    value={logVpsId}
+                    onChange={(e) => setLogVpsId(e.target.value)}
+                  >
+                    {instances.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {instances.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No instances yet.</div>
+              ) : recentLogs.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No logs available.</div>
+              ) : (
+                <div className="bg-[#06060a]/90 rounded-lg border border-white/5 p-3 h-32 overflow-y-auto font-mono text-xs space-y-1">
+                  {recentLogs.map((line, idx) => (
+                    <div key={idx} className="whitespace-pre-wrap text-foreground/80">
+                      {line}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
