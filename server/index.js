@@ -19,6 +19,7 @@ const createVpsRoutes = require("./routes/vps");
 const createLogsRoutes = require("./routes/logs");
 
 const app = express();
+app.set("trust proxy", 1);
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
