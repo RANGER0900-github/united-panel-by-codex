@@ -94,7 +94,7 @@ export default function VpsDetail() {
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">{vps.name}</h1>
             <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
-              <span className={`px-3 py-1 rounded-full text-xs uppercase ${statusBadge}`}>{vps.status}</span>
+              <span data-status={vps.status} className={`px-3 py-1 rounded-full text-xs uppercase ${statusBadge}`}>{vps.status}</span>
               <span>{vps.ip_address || "No IP assigned"}</span>
               <span>{vps.technology}</span>
               <span>{vps.image}</span>

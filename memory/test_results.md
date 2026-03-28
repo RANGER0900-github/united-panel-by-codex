@@ -14,3 +14,15 @@
 [PASS] T14 — VPS delete succeeded and resource removed
 [PASS] T15 — Validation errors returned on bad input
 [PASS] T16 — Rate limit returned 429 after repeated attempts
+[PASS] B01 — Login form visible
+[PASS] B02 — Wrong credentials error visible
+[PASS] B03 — Correct credentials and dashboard render
+[PASS] B04 — Dashboard live metrics render without undefined/NaN
+[PASS] B05 — VPS list empty state visible
+[PASS] B06 — Create VPS modal and tech selector render
+[PASS] B07 — VPS created and RUNNING status shown
+[PASS] B08 — VPS detail page renders key fields
+[PASS] B09 — VPS stop action changes status to STOPPED
+[PASS] B10 — VPS delete removes instance
+[PASS] B11 — Mobile viewport has no horizontal overflow
+[PASS] B12 — Zero console errors during happy path

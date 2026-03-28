@@ -25,12 +25,17 @@ const queryClient = new QueryClient({
 
 function Router() {
   const [location, setLocation] = useLocation();
+  const token = getToken();
 
   useEffect(() => {
-    if (location !== "/login" && !getToken()) {
+    if (location !== "/login" && !token) {
       setLocation("/login");
     }
-  }, [location, setLocation]);
+  }, [location, setLocation, token]);
+
+  if (location !== "/login" && !token) {
+    return null;
+  }
 
   if (location === "/login") {
     return <Login />;

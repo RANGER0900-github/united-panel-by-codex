@@ -60,7 +60,9 @@ export default function Dashboard() {
       setMetrics(data);
       setHistory((prev) => [...prev, { ...data, timestamp: Date.now() }].slice(-60));
     });
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const chartData = useMemo(() => {

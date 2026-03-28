@@ -57,15 +57,15 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] T14 — delete VPS
 [x] T15 — validation errors
 [x] T16 — rate limit
-[ ] B01 — Login form visible
-[ ] B02 — Wrong credentials error
-[ ] B03 — Correct credentials and dashboard
-[ ] B04 — Dashboard live data
-[ ] B05 — VPS list empty state
-[ ] B06 — Create VPS modal and tech selector
-[ ] B07 — Create VPS and RUNNING status
-[ ] B08 — VPS detail page
-[ ] B09 — Stop VPS
-[ ] B10 — Delete VPS
-[ ] B11 — Mobile viewport
-[ ] B12 — Zero console errors
+[x] B01 — Login form visible
+[x] B02 — Wrong credentials error
+[x] B03 — Correct credentials and dashboard
+[x] B04 — Dashboard live data
+[x] B05 — VPS list empty state
+[x] B06 — Create VPS modal and tech selector
+[x] B07 — Create VPS and RUNNING status
+[x] B08 — VPS detail page
+[x] B09 — Stop VPS
+[x] B10 — Delete VPS
+[x] B11 — Mobile viewport
+[x] B12 — Zero console errors
