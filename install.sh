@@ -44,8 +44,12 @@ FREE_KB=$(df / | awk 'NR==2{print $4}')
 
 if [ -f "$INSTALL_DIR/config/config.json" ]; then
   warn "Existing installation detected at $INSTALL_DIR"
-  read -rp "Upgrade? [y/N]: " UPGRADE
-  [ "$UPGRADE" = "y" ] || fail "Aborted."
+  if [ "${AUTO_UPGRADE:-}" = "1" ]; then
+    ok "AUTO_UPGRADE=1 set; continuing with upgrade."
+  else
+    read -rp "Upgrade? [y/N]: " UPGRADE
+    [ "$UPGRADE" = "y" ] || fail "Aborted."
+  fi
 fi
 
 # ── SECTION 2: SYSTEM PACKAGES ───────────────────────────────
@@ -249,6 +253,10 @@ if [ "$JS_PKG" = "pnpm" ]; then
   CI=true pnpm install --prod
 else
   npm install --production --silent
+fi
+
+if [ -f "$INSTALL_DIR/server/package.json" ]; then
+  (cd "$INSTALL_DIR/server" && npm install --omit=dev --silent)
 fi
 ok "Backend dependencies installed"
 
