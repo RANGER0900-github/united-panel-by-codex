@@ -1,7 +1,7 @@
 import axios from "axios";
 import { io } from "socket.io-client";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
 const getToken = () => localStorage.getItem("vpspanel_token");
 const setToken = (token) => localStorage.setItem("vpspanel_token", token);
