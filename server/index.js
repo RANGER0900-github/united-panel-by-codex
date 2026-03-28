@@ -54,7 +54,7 @@ app.use("/api/vps", logsRoutes);
 if (process.env.NODE_ENV === "production") {
   const frontendDir = path.join(__dirname, "../artifacts/vps-panel/dist/public");
   app.use(express.static(frontendDir));
-  app.get("/*", (req, res) => {
+  app.get(/.*/, (req, res) => {
     res.sendFile(path.join(frontendDir, "index.html"));
   });
 }
