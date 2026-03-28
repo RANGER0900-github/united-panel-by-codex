@@ -16,11 +16,28 @@ fail() { echo "[$(date '+%H:%M:%S')] ✗ $*"; exit 1; }
 log "Checking prerequisites..."
 [ "$(id -u)" = "0" ] || fail "Must run as root. Try: sudo bash install.sh"
 
-source /etc/os-release 2>/dev/null || fail "Cannot detect OS"
-case "$ID-$VERSION_ID" in
-  ubuntu-20.04|ubuntu-22.04|ubuntu-24.04|debian-11|debian-12) ok "OS: $ID $VERSION_ID" ;;
-  *) fail "Unsupported OS: $ID $VERSION_ID. Supported: Ubuntu 20.04+ or Debian 11+" ;;
-esac
+if source /etc/os-release 2>/dev/null; then
+  ok "OS: ${ID:-unknown} ${VERSION_ID:-unknown}"
+else
+  warn "Cannot detect OS (missing /etc/os-release). Proceeding best-effort."
+fi
+
+PKG_MGR="none"
+if command -v apt-get >/dev/null 2>&1; then
+  PKG_MGR="apt"
+elif command -v dnf >/dev/null 2>&1; then
+  PKG_MGR="dnf"
+elif command -v yum >/dev/null 2>&1; then
+  PKG_MGR="yum"
+elif command -v pacman >/dev/null 2>&1; then
+  PKG_MGR="pacman"
+elif command -v apk >/dev/null 2>&1; then
+  PKG_MGR="apk"
+elif command -v zypper >/dev/null 2>&1; then
+  PKG_MGR="zypper"
+else
+  warn "No supported package manager found. Skipping system package installs."
+fi
 
 FREE_KB=$(df / | awk 'NR==2{print $4}')
 [ "$FREE_KB" -gt $((10*1024*1024)) ] || warn "Low disk space: less than 10GB free"
@@ -32,32 +49,121 @@ if [ -f "$INSTALL_DIR/config/config.json" ]; then
 fi
 
 # ── SECTION 2: SYSTEM PACKAGES ───────────────────────────────
-log "Installing system packages..."
-
-# Wait for dpkg lock
-while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-  log "Waiting for dpkg lock..."; sleep 3
-done
-
-apt-get update -qq
-apt-get upgrade -y -qq
-apt-get install -y -qq \
-  curl wget git jq lsof net-tools iproute2 \
-  ca-certificates gnupg iptables nftables \
-  build-essential lxc lxcfs lxc-templates
-ok "System packages installed"
+if [ "${SKIP_SYSTEM_PACKAGES:-}" = "1" ]; then
+  warn "Skipping system package installation (SKIP_SYSTEM_PACKAGES=1)"
+else
+  log "Installing system packages..."
+fi
+case "$PKG_MGR" in
+  apt)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" = "1" ]; then
+      :
+    else
+      while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        log "Waiting for dpkg lock..."; sleep 3
+      done
+      export DEBIAN_FRONTEND=noninteractive
+      if ! apt-get update -qq; then
+        warn "apt-get update failed; continuing without system package install."
+      elif ! apt-get install -y -qq --no-install-recommends \
+        curl wget git jq lsof net-tools iproute2 \
+        ca-certificates gnupg iptables nftables \
+        build-essential lxc lxcfs lxc-templates rsync; then
+        warn "apt-get install failed; continuing with existing packages."
+      fi
+    fi
+    ;;
+  dnf)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+      dnf -y -q upgrade || true
+      dnf -y -q install \
+        curl wget git jq lsof net-tools iproute \
+        ca-certificates gnupg2 iptables nftables \
+        make gcc gcc-c++ lxc lxcfs rsync || warn "dnf install failed; continuing."
+    fi
+    ;;
+  yum)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+      yum -y -q update || true
+      yum -y -q install \
+        curl wget git jq lsof net-tools iproute \
+        ca-certificates gnupg2 iptables nftables \
+        make gcc gcc-c++ lxc lxcfs rsync || warn "yum install failed; continuing."
+    fi
+    ;;
+  pacman)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+      pacman -Sy --noconfirm
+      pacman -S --noconfirm \
+        curl wget git jq lsof net-tools iproute2 \
+        ca-certificates gnupg iptables nftables \
+        base-devel lxc rsync || warn "pacman install failed; continuing."
+    fi
+    ;;
+  apk)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+      apk update
+      apk add \
+        curl wget git jq lsof net-tools iproute2 \
+        ca-certificates gnupg iptables nftables \
+        build-base lxc rsync || warn "apk add failed; continuing."
+    fi
+    ;;
+  zypper)
+    if [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+      zypper -n refresh
+      zypper -n install \
+        curl wget git jq lsof net-tools iproute2 \
+        ca-certificates gpg2 iptables nftables \
+        gcc gcc-c++ make lxc rsync || warn "zypper install failed; continuing."
+    fi
+    ;;
+  *)
+    warn "Skipping system package install; continue with existing tools."
+    ;;
+esac
+ok "System packages installed (or skipped)"
 
 # ── SECTION 3: NODE.JS ───────────────────────────────────────
-log "Installing Node.js LTS..."
-curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1
-apt-get install -y -qq nodejs
-NODE_VER=$(node --version)
-ok "Node.js $NODE_VER"
+if command -v node >/dev/null 2>&1; then
+  NODE_VER=$(node --version)
+  ok "Node.js already installed ($NODE_VER)"
+else
+  log "Installing Node.js LTS..."
+  case "$PKG_MGR" in
+    apt)
+      curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1
+      apt-get install -y -qq nodejs
+      ;;
+    dnf|yum)
+      curl -fsSL https://rpm.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1
+      ${PKG_MGR} -y -q install nodejs
+      ;;
+    pacman)
+      pacman -S --noconfirm nodejs npm
+      ;;
+    apk)
+      apk add nodejs npm
+      ;;
+    zypper)
+      zypper -n install nodejs npm
+      ;;
+    *)
+      fail "Node.js is required but no supported package manager was found."
+      ;;
+  esac
+  NODE_VER=$(node --version)
+  ok "Node.js $NODE_VER"
+fi
 
 # ── SECTION 4: LXC SERVICE ───────────────────────────────────
-systemctl enable lxcfs >/dev/null 2>&1 || true
-systemctl start lxcfs >/dev/null 2>&1 || warn "lxcfs could not start (non-fatal)"
-ok "LXC ready"
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl enable lxcfs >/dev/null 2>&1 || true
+  systemctl start lxcfs >/dev/null 2>&1 || warn "lxcfs could not start (non-fatal)"
+  ok "LXC ready"
+else
+  warn "systemctl not available; skipping lxcfs service management."
+fi
 
 # ── SECTION 5: OPTIONAL — gVisor ─────────────────────────────
 install_gvisor() {
@@ -69,7 +175,11 @@ install_gvisor() {
   apt-get update -qq && apt-get install -y -qq runsc
   ok "gVisor (runsc) installed"
 }
-install_gvisor 2>/dev/null || warn "gVisor unavailable on this host — skipping"
+if [ "$PKG_MGR" = "apt" ] && [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+  install_gvisor 2>/dev/null || warn "gVisor unavailable on this host — skipping"
+else
+  warn "gVisor install is only automated for apt-based systems — skipping"
+fi
 
 # ── SECTION 6: OPTIONAL — Sysbox ─────────────────────────────
 install_sysbox() {
@@ -80,19 +190,41 @@ install_sysbox() {
   rm -f $SYSBOX_DEB
   ok "Sysbox installed"
 }
-install_sysbox 2>/dev/null || warn "Sysbox unavailable on this host — skipping"
+if [ "$PKG_MGR" = "apt" ] && [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ]; then
+  install_sysbox 2>/dev/null || warn "Sysbox unavailable on this host — skipping"
+else
+  warn "Sysbox install is only automated for apt-based systems — skipping"
+fi
 
 # ── SECTION 7: CLOUDFLARED ───────────────────────────────────
 log "Installing cloudflared..."
-ARCH=$(dpkg --print-architecture)
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | \
-  gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
-  https://pkg.cloudflare.com/cloudflared $VERSION_CODENAME main" \
-  > /etc/apt/sources.list.d/cloudflared.list
-apt-get update -qq && apt-get install -y -qq cloudflared || \
-  (wget -q "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$ARCH" \
-    -O /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared)
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64|amd64) CF_ARCH="amd64" ;;
+  aarch64|arm64) CF_ARCH="arm64" ;;
+  armv7l|armv6l) CF_ARCH="arm" ;;
+  *) CF_ARCH="amd64" ;;
+esac
+if [ "$PKG_MGR" = "apt" ] && [ "${SKIP_SYSTEM_PACKAGES:-}" != "1" ] && command -v gpg >/dev/null 2>&1; then
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | \
+    gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+  if [ -n "${VERSION_CODENAME:-}" ]; then
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
+      https://pkg.cloudflare.com/cloudflared $VERSION_CODENAME main" \
+      > /etc/apt/sources.list.d/cloudflared.list
+    apt-get update -qq && apt-get install -y -qq cloudflared
+  else
+    warn "VERSION_CODENAME missing; falling back to binary install."
+    wget -q "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$CF_ARCH" \
+      -O /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
+  fi
+else
+  CF_TMP=$(mktemp)
+  wget -q "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$CF_ARCH" \
+    -O "$CF_TMP"
+  chmod +x "$CF_TMP"
+  mv -f "$CF_TMP" /usr/local/bin/cloudflared
+fi
 ok "cloudflared installed"
 
 # ── SECTION 8: COPY SOURCE + BUILD ───────────────────────────
@@ -102,14 +234,34 @@ rsync -a --exclude='node_modules' --exclude='.git' \
   "$(dirname "$(realpath "$0")")/" "$INSTALL_DIR/"
 
 cd "$INSTALL_DIR"
-npm install --production --silent
+JS_PKG="npm"
+if command -v pnpm >/dev/null 2>&1; then
+  JS_PKG="pnpm"
+elif command -v corepack >/dev/null 2>&1; then
+  corepack enable >/dev/null 2>&1 || true
+  corepack prepare pnpm@latest --activate >/dev/null 2>&1 || true
+  if command -v pnpm >/dev/null 2>&1; then
+    JS_PKG="pnpm"
+  fi
+fi
+
+if [ "$JS_PKG" = "pnpm" ]; then
+  CI=true pnpm install --prod
+else
+  npm install --production --silent
+fi
 ok "Backend dependencies installed"
 
 # Build frontend
 FRONTEND_DIR="artifacts/vps-panel"
 cd "$INSTALL_DIR/$FRONTEND_DIR"
-npm install --silent
-VITE_API_URL="" npm run build
+if [ "$JS_PKG" = "pnpm" ]; then
+  CI=true pnpm install
+  BASE_PATH=/ PORT=5173 VITE_API_URL="" pnpm run build
+else
+  npm install --silent
+  BASE_PATH=/ PORT=5173 VITE_API_URL="" npm run build
+fi
 ok "Frontend built"
 cd "$INSTALL_DIR"
 
@@ -162,7 +314,13 @@ id vpspanel &>/dev/null || useradd -r -s /bin/false -d "$INSTALL_DIR" vpspanel
 # TODO: reduce privileges in a future hardening pass
 
 # ── SECTION 12: SYSTEMD SERVICE ──────────────────────────────
-cat > /etc/systemd/system/vpspanel.service << EOF
+NODE_BIN=$(command -v node || true)
+if [ -z "$NODE_BIN" ]; then
+  fail "Node.js not found after install."
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  cat > /etc/systemd/system/vpspanel.service << EOF
 [Unit]
 Description=VPS Management Panel
 After=network.target lxcfs.service
@@ -172,7 +330,7 @@ Wants=lxcfs.service
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/node $INSTALL_DIR/server/index.js
+ExecStart=$NODE_BIN $INSTALL_DIR/server/index.js
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -183,10 +341,16 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable vpspanel
-systemctl start vpspanel
-ok "Service started"
+  systemctl daemon-reload
+  systemctl enable vpspanel
+  systemctl start vpspanel
+  ok "Service started (systemd)"
+else
+  warn "systemctl not available; starting panel in background."
+  nohup "$NODE_BIN" "$INSTALL_DIR/server/index.js" >> "$LOG_DIR/panel.log" 2>&1 &
+  echo $! > "$INSTALL_DIR/vpspanel.pid"
+  ok "Service started (nohup, pid: $(cat "$INSTALL_DIR/vpspanel.pid"))"
+fi
 
 # ── SECTION 13: HEALTH CHECK ─────────────────────────────────
 log "Waiting for panel to become healthy..."
@@ -196,7 +360,7 @@ for i in 1 2 3 4 5; do
     break
   fi
   [ "$i" -lt 5 ] && { log "Attempt $i/5 — retrying in 5s..."; sleep 5; } || \
-    { fail "Panel failed to start. Check: journalctl -u vpspanel -n 50"; }
+    { fail "Panel failed to start. Check logs for details."; }
 done
 
 # ── SECTION 14: SUCCESS OUTPUT ───────────────────────────────
@@ -210,8 +374,13 @@ else
   echo "  URL:      http://localhost:3000 (local only)"
 fi
 echo "  Credentials: $INSTALL_DIR/config/credentials.txt"
-echo "  Logs:     journalctl -u vpspanel -f"
-echo "  Status:   systemctl status vpspanel"
+if command -v systemctl >/dev/null 2>&1; then
+  echo "  Logs:     journalctl -u vpspanel -f"
+  echo "  Status:   systemctl status vpspanel"
+else
+  echo "  Logs:     tail -f $LOG_DIR/panel.log"
+  echo "  Status:   ps -p $(cat "$INSTALL_DIR/vpspanel.pid")"
+fi
 echo "  Uninstall: systemctl disable --now vpspanel && rm -rf $INSTALL_DIR"
 echo "════════════════════════════════════════════════"
 if [ "$NETWORK_MODE" = "tunnel" ]; then
