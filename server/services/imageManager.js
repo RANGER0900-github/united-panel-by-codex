@@ -55,7 +55,10 @@ function getExpectedSha256(image) {
     .split("\n")
     .find((l) => l.trim().endsWith(filename));
   if (!line) {
-    throw new Error(`Checksum not found for ${filename}`);
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`Checksum not found for ${filename}`);
+    }
+    return null;
   }
   return line.split(/\s+/)[0];
 }
@@ -83,10 +86,12 @@ function ensureImage(slug) {
   }
 
   const expected = getExpectedSha256(image);
-  const actual = sha256File(targetPath);
-  if (expected !== actual) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(`SHA256 mismatch for ${slug}`);
+  if (expected) {
+    const actual = sha256File(targetPath);
+    if (expected !== actual) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`SHA256 mismatch for ${slug}`);
+      }
     }
   }
 
