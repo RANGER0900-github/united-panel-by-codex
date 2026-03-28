@@ -20,10 +20,14 @@ function listMounts() {
 
     if (EXCLUDED_TYPES.has(fstype)) continue;
     if (available < MIN_FREE_BYTES) continue;
-    try {
-      fs.accessSync(mount, fs.constants.W_OK);
-    } catch {
-      continue;
+    const isRoot =
+      typeof process.getuid === "function" ? process.getuid() === 0 : false;
+    if (isRoot) {
+      try {
+        fs.accessSync(mount, fs.constants.W_OK);
+      } catch {
+        continue;
+      }
     }
 
     mounts.push({
