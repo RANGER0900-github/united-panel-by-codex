@@ -20,7 +20,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P2.14 — server/services/imageManager.js
 [x] P2.15 — server/services/storageManager.js
 [x] P2.16 — server/services/networkManager.js
-[ ] P2.17 — server/services/expiry.js
+[x] P2.17 — server/services/expiry.js
 [ ] P2.18 — server/routes/health.js
 [ ] P2.19 — server/routes/auth.js
 [ ] P2.20 — server/routes/host.js
