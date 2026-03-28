@@ -36,8 +36,8 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P3.3 — Create .env files
 [x] P3.4 — Wire auth
 [x] P3.5 — Wire dashboard metrics
-[ ] P3.6 — Wire VPS list
-[ ] P3.7 — Technology selector component
-[ ] P3.8 — Wire create VPS wizard/modal
-[ ] P3.9 — Wire VPS detail page
+[x] P3.6 — Wire VPS list
+[x] P3.7 — Technology selector component
+[x] P3.8 — Wire create VPS wizard/modal
+[x] P3.9 — Wire VPS detail page
 [ ] P3.10 — Build and verify

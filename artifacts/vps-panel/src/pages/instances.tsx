@@ -1,48 +1,62 @@
-import React, { useState, useCallback, memo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { PageTransition } from "@/components/page-transition";
-import {
-  useListInstances,
-  useCreateInstance,
-  useDeleteInstance,
-  useStartInstance,
-  useStopInstance,
-  useRestartInstance,
-  useGetHostCapabilities,
-  getListInstancesQueryKey
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  Play, Square, RotateCw, Trash2, Plus, Terminal, Cpu, MemoryStick,
-  HardDrive, Copy, Check, Wifi, WifiOff, CloudLightning, ShieldAlert,
-  Clock, Globe, Server, ChevronDown, ChevronUp, Key, RefreshCw
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { api, connectSocket } from "@/api/client";
+import { TechSelector } from "@/components/tech-selector";
+import {
+  Play, Square, RotateCw, Trash2, Plus, Server, Cpu, MemoryStick, HardDrive, Clock,
+} from "lucide-react";
 
-const OS_OPTIONS = [
-  { value: "ubuntu-22.04", label: "Ubuntu 22.04 LTS" },
-  { value: "ubuntu-20.04", label: "Ubuntu 20.04 LTS" },
-  { value: "debian-12", label: "Debian 12" },
-  { value: "debian-11", label: "Debian 11" },
-  { value: "alpine-3.18", label: "Alpine 3.18" },
-  { value: "centos-9", label: "CentOS Stream 9" },
-  { value: "fedora-38", label: "Fedora 38" },
-  { value: "arch-linux", label: "Arch Linux" },
-];
-
-const TIMEZONE_OPTIONS = [
-  "UTC", "America/New_York", "America/Chicago", "America/Los_Angeles",
-  "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Tokyo",
-  "Asia/Singapore", "Asia/Kolkata", "Australia/Sydney",
-];
+type Vps = {
+  id: string;
+  name: string;
+  status: string;
+  cpu: number;
+  ram_mb: number;
+  disk_gb: number;
+  ip_address?: string | null;
+  technology: string;
+  image: string;
+  expires_at?: number | null;
+};
 
 export default function Instances() {
-  const { data: instancesData, isLoading } = useListInstances({ query: { refetchInterval: 15000, staleTime: 10000 } });
-  const { data: caps } = useGetHostCapabilities({ query: { staleTime: 60000 } });
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [vps, setVps] = useState<Vps[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const handleCreateSuccess = useCallback(() => setIsCreateOpen(false), []);
+  const fetchVps = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get("/api/vps");
+      setVps(response.data?.data || []);
+    } catch (err) {
+      toast({ title: "Failed to load VPS", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVps();
+    const socket = connectSocket();
+    socket.on("vps:update", (update: any) => {
+      setVps((prev) => {
+        const exists = prev.find((item) => item.id === update.id);
+        if (!exists) return prev;
+        return prev.map((item) => (item.id === update.id ? { ...item, ...update } : item));
+      });
+    });
+    return () => socket.disconnect();
+  }, []);
+
+  const handleCreateSuccess = () => {
+    setIsCreateOpen(false);
+    fetchVps();
+  };
 
   return (
     <PageTransition>
@@ -52,25 +66,20 @@ export default function Instances() {
             <h1 className="text-4xl font-display font-bold text-foreground">Instances</h1>
             <p className="text-muted-foreground mt-1">Deploy and manage virtual environments.</p>
           </div>
-          <div className="flex items-center gap-3">
-            {!caps?.publicIpv4 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs">
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>No Public IPv4</span>
-              </div>
-            )}
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <button className="px-6 py-3 rounded-xl font-semibold bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,212,255,0.35)] hover:shadow-[0_0_30px_rgba(0,212,255,0.55)] hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Deploy Instance
-                </button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[680px] glass-card border border-primary/30 p-0 overflow-hidden max-h-[90vh]">
-                <CreateInstanceForm caps={caps} onSuccess={handleCreateSuccess} />
-              </DialogContent>
-            </Dialog>
-          </div>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <button className="px-6 py-3 rounded-xl font-semibold bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,212,255,0.35)] hover:shadow-[0_0_30px_rgba(0,212,255,0.55)] hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Deploy Instance
+              </button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[720px] glass-card border border-primary/30 p-0 overflow-hidden max-h-[90vh]">
+              <DialogHeader className="px-6 pt-6 pb-2">
+                <DialogTitle className="text-xl font-semibold">Create VPS</DialogTitle>
+              </DialogHeader>
+              <CreateVpsForm onSuccess={handleCreateSuccess} />
+            </DialogContent>
+          </Dialog>
         </header>
 
         {isLoading ? (
@@ -79,19 +88,19 @@ export default function Instances() {
               <div key={i} className="glass-card rounded-2xl h-72 bg-white/5 animate-pulse" />
             ))}
           </div>
-        ) : instancesData?.instances.length === 0 ? (
+        ) : vps.length === 0 ? (
           <div className="glass-card rounded-2xl p-12 text-center border-dashed border-white/20">
             <Server className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h3 className="text-xl font-semibold text-foreground">No instances deployed</h3>
-            <p className="text-muted-foreground mt-2 max-w-md mx-auto">Click "Deploy Instance" to provision your first virtual environment.</p>
+            <h3 className="text-xl font-semibold text-foreground mb-2">No instances yet</h3>
+            <p className="text-muted-foreground text-sm mb-6">
+              Create your first VPS to start managing compute resources.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            <AnimatePresence mode="popLayout">
-              {instancesData?.instances.map((instance: any) => (
-                <InstanceCard key={instance.id} instance={instance} hostHasPublicIpv4={caps?.publicIpv4 ?? true} />
-              ))}
-            </AnimatePresence>
+            {vps.map((instance) => (
+              <VpsCard key={instance.id} instance={instance} onRefresh={fetchVps} />
+            ))}
           </div>
         )}
       </div>
@@ -99,556 +108,261 @@ export default function Instances() {
   );
 }
 
-const InstanceCard = memo(function InstanceCard({ instance, hostHasPublicIpv4 }: { instance: any; hostHasPublicIpv4: boolean }) {
-  const queryClient = useQueryClient();
+function VpsCard({ instance, onRefresh }: { instance: Vps; onRefresh: () => void }) {
   const { toast } = useToast();
-  const [sshCopied, setSshCopied] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [cfLoading, setCfLoading] = useState(false);
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: getListInstancesQueryKey() });
-  }, [queryClient]);
+  const statusConfig: Record<string, string> = {
+    RUNNING: "bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20",
+    STOPPED: "bg-white/5 text-muted-foreground border border-white/10",
+    CREATING: "bg-[#ffb800]/10 text-[#ffb800] border border-[#ffb800]/20",
+    REBOOTING: "bg-[#4f9cff]/10 text-[#4f9cff] border border-[#4f9cff]/20",
+    FAILED: "bg-destructive/10 text-destructive border border-destructive/20",
+    DELETING: "bg-[#f48120]/10 text-[#f48120] border border-[#f48120]/20",
+    STOPPING: "bg-[#ffb800]/10 text-[#ffb800] border border-[#ffb800]/20",
+  };
 
-  const showSuccess = useCallback((msg: string) => {
-    toast({ title: "Success", description: msg });
-    invalidate();
-  }, [toast, invalidate]);
+  const statusBadge = statusConfig[instance.status] || statusConfig.STOPPED;
 
-  const showError = useCallback((err: any) => {
-    toast({ title: "Error", description: err?.message || "Action failed", variant: "destructive" });
-  }, [toast]);
-
-  const startMutation = useStartInstance({ mutation: { onSuccess: () => showSuccess("Instance starting…"), onError: showError } });
-  const stopMutation = useStopInstance({ mutation: { onSuccess: () => showSuccess("Instance stopping…"), onError: showError } });
-  const restartMutation = useRestartInstance({ mutation: { onSuccess: () => showSuccess("Instance restarting…"), onError: showError } });
-  const deleteMutation = useDeleteInstance({ mutation: { onSuccess: () => showSuccess("Instance deleted"), onError: showError } });
-
-  const isRunning = instance.status === "running";
-  const isPending = instance.status === "starting" || instance.status === "stopping";
-  const isError = instance.status === "error";
-  const hasIp = !!instance.ipAddress;
-  const hasPublicIp = hasIp && instance.hasPublicIpv4;
-  const needsCfTunnel = !hasPublicIp && isRunning;
-
-  const sshCommand = hasIp
-    ? `ssh ${instance.sshUsername || 'root'}@${instance.ipAddress} -p ${instance.sshPort || 22}`
-    : instance.cfTunnelUrl
-    ? `# Use Cloudflare Tunnel: ${instance.cfTunnelUrl}`
-    : `# No IP assigned — start instance first`;
-
-  const handleCopySSH = useCallback(() => {
-    navigator.clipboard.writeText(sshCommand);
-    setSshCopied(true);
-    setTimeout(() => setSshCopied(false), 2000);
-  }, [sshCommand]);
-
-  const handleCFTunnel = useCallback(async () => {
-    setCfLoading(true);
+  const handleAction = async (action: "start" | "stop" | "reboot") => {
     try {
-      const res = await fetch(`/api/instances/${instance.id}/cf-tunnel`, { method: "POST" });
-      const data = await res.json();
-      if (data.tunnelUrl) {
-        toast({ title: "Cloudflare Tunnel Activated", description: data.tunnelUrl });
-        invalidate();
-      }
-    } catch {
-      toast({ title: "Tunnel Failed", description: "Could not activate Cloudflare tunnel", variant: "destructive" });
+      await api.post(`/api/vps/${instance.id}/${action}`);
+      toast({ title: `VPS ${action} queued` });
+      onRefresh();
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.error || "Action failed", variant: "destructive" });
     }
-    setCfLoading(false);
-  }, [instance.id, toast, invalidate]);
+  };
 
-  const handleDelete = useCallback(() => {
-    if (confirm(`Permanently destroy "${instance.name}"? This cannot be undone.`)) {
-      deleteMutation.mutate({ id: instance.id });
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${instance.name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/api/vps/${instance.id}`);
+      toast({ title: "VPS deleted" });
+      onRefresh();
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.error || "Delete failed", variant: "destructive" });
     }
-  }, [instance.id, instance.name, deleteMutation]);
+  };
+
+  const expiresIn = useMemo(() => {
+    if (!instance.expires_at) return null;
+    const ms = instance.expires_at * 1000 - Date.now();
+    if (ms <= 0) return "Expired";
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  }, [instance.expires_at]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
-      className={`glass-card rounded-2xl p-5 border flex flex-col gap-4 transition-colors duration-300 ${
-        isRunning ? "border-primary/30 hover:border-primary/60" :
-        isError ? "border-destructive/40" :
-        "border-white/10 hover:border-white/25"
-      }`}
-    >
-      {/* Header */}
+    <div className="glass-card rounded-2xl p-5 border border-white/10 flex flex-col gap-4">
       <div className="flex justify-between items-start">
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-bold text-foreground truncate">{instance.name}</h3>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-xs font-mono text-muted-foreground uppercase">{instance.type}</span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
+            <span className="uppercase">{instance.technology}</span>
             <span className="text-muted-foreground/40">•</span>
-            <span className="text-xs text-muted-foreground truncate">{instance.os}</span>
-            {instance.hostname && instance.hostname !== instance.name && (
-              <>
-                <span className="text-muted-foreground/40">•</span>
-                <span className="text-xs text-muted-foreground/60 font-mono truncate">{instance.hostname}</span>
-              </>
-            )}
+            <span className="truncate">{instance.image}</span>
           </div>
         </div>
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shrink-0 ml-2 ${
-          isRunning ? "bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20" :
-          isPending ? "bg-[#ffb800]/10 text-[#ffb800] border border-[#ffb800]/20" :
-          isError ? "bg-destructive/10 text-destructive border border-destructive/20" :
-          "bg-white/5 text-muted-foreground border border-white/10"
-        }`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            isRunning ? "bg-[#00ff88] animate-pulse" :
-            isPending ? "bg-[#ffb800] animate-pulse" :
-            isError ? "bg-destructive" : "bg-muted-foreground"
-          }`} />
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shrink-0 ml-2 ${statusBadge}`}>
           {instance.status}
         </div>
       </div>
 
-      {/* Resource Stats */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-background/50 rounded-xl p-2.5 border border-white/5 text-center">
-          <Cpu className="w-3.5 h-3.5 mx-auto mb-1 text-primary" />
-          <p className="font-mono font-bold text-sm">{instance.cpuCores} vCPU</p>
-        </div>
-        <div className="bg-background/50 rounded-xl p-2.5 border border-white/5 text-center">
-          <MemoryStick className="w-3.5 h-3.5 mx-auto mb-1 text-secondary" />
-          <p className="font-mono font-bold text-sm">{(instance.memoryMb / 1024).toFixed(1)} GB</p>
-        </div>
-        <div className="bg-background/50 rounded-xl p-2.5 border border-white/5 text-center">
-          <HardDrive className="w-3.5 h-3.5 mx-auto mb-1 text-accent" />
-          <p className="font-mono font-bold text-sm">{instance.diskGb} GB</p>
-        </div>
-      </div>
-
-      {/* Network + SSH Row */}
-      <div className="space-y-2">
-        {/* IP Badge */}
+      <div className="grid grid-cols-3 gap-3 text-xs">
         <div className="flex items-center gap-2">
-          {hasIp ? (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50 border border-white/5 text-xs font-mono text-muted-foreground">
-              <Globe className="w-3 h-3 text-primary" />
-              <span>{instance.ipAddress}</span>
-              {!instance.hasPublicIpv4 && <span className="text-yellow-400/70 ml-1">(NAT)</span>}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50 border border-white/5 text-xs text-muted-foreground/50">
-              <WifiOff className="w-3 h-3" /> No IP
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50 border border-white/5 text-xs font-mono text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            <span>{instance.timezone || 'UTC'}</span>
-          </div>
-          {instance.autoStart && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
-              <RefreshCw className="w-3 h-3" /> Auto
-            </div>
-          )}
+          <Cpu className="w-4 h-4 text-primary" />
+          <span>{instance.cpu} vCPU</span>
         </div>
+        <div className="flex items-center gap-2">
+          <MemoryStick className="w-4 h-4 text-secondary" />
+          <span>{instance.ram_mb} MB</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <HardDrive className="w-4 h-4 text-accent" />
+          <span>{instance.disk_gb} GB</span>
+        </div>
+      </div>
 
-        {/* SSH Command Box */}
-        <div
-          className="group flex items-center justify-between gap-2 p-2.5 bg-black/40 border border-white/5 hover:border-primary/30 rounded-xl cursor-pointer transition-all"
-          onClick={handleCopySSH}
-          title="Click to copy SSH command"
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{instance.ip_address || "No IP assigned"}</span>
+        {expiresIn && (
+          <span className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" /> Expires in {expiresIn}
+          </span>
+        )}
+      </div>
+
+      <div className="flex gap-2 pt-2 border-t border-white/5">
+        <Link
+          href={`/vps/${instance.id}`}
+          className="flex-1 py-2 rounded-lg border border-white/10 text-xs uppercase tracking-widest text-center hover:border-primary/30 hover:text-primary transition-colors"
         >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Terminal className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span className="font-mono text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
-              {sshCommand}
-            </span>
-          </div>
-          <div className="shrink-0 text-muted-foreground group-hover:text-primary transition-colors">
-            {sshCopied ? <Check className="w-3.5 h-3.5 text-[#00ff88]" /> : <Copy className="w-3.5 h-3.5" />}
-          </div>
-        </div>
-
-        {/* Cloudflare Tunnel — shown when no public IPv4 */}
-        {needsCfTunnel && !instance.cfTunnelUrl && (
+          Details
+        </Link>
+        {instance.status === "STOPPED" && (
           <button
-            onClick={handleCFTunnel}
-            disabled={cfLoading}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold bg-[#f48120]/10 text-[#f48120] border border-[#f48120]/25 hover:bg-[#f48120]/20 hover:border-[#f48120]/50 transition-all disabled:opacity-60"
+            onClick={() => handleAction("start")}
+            className="flex-1 py-2 rounded-lg border border-white/10 text-xs uppercase tracking-widest hover:border-primary/30 hover:text-primary transition-colors"
           >
-            <CloudLightning className={`w-3.5 h-3.5 ${cfLoading ? 'animate-pulse' : ''}`} />
-            {cfLoading ? 'Activating Tunnel…' : 'Activate Cloudflare Tunnel'}
+            <Play className="w-4 h-4 inline mr-1" /> Start
           </button>
         )}
-
-        {instance.cfTunnelUrl && (
-          <div className="flex items-center gap-2 p-2 bg-[#f48120]/5 border border-[#f48120]/20 rounded-xl">
-            <CloudLightning className="w-3.5 h-3.5 text-[#f48120] shrink-0" />
-            <span className="font-mono text-xs text-[#f48120] truncate">{instance.cfTunnelUrl}</span>
+        {instance.status === "RUNNING" && (
+          <>
             <button
-              onClick={() => { navigator.clipboard.writeText(instance.cfTunnelUrl); toast({ title: "Copied", description: "Tunnel URL copied" }); }}
-              className="shrink-0 ml-auto text-[#f48120]/50 hover:text-[#f48120] transition-colors"
+              onClick={() => handleAction("stop")}
+              className="flex-1 py-2 rounded-lg border border-white/10 text-xs uppercase tracking-widest hover:border-[#ffb800]/40 hover:text-[#ffb800] transition-colors"
             >
-              <Copy className="w-3 h-3" />
+              <Square className="w-4 h-4 inline mr-1" /> Stop
             </button>
-          </div>
+            <button
+              onClick={() => handleAction("reboot")}
+              className="flex-1 py-2 rounded-lg border border-white/10 text-xs uppercase tracking-widest hover:border-[#4f9cff]/40 hover:text-[#4f9cff] transition-colors"
+            >
+              <RotateCw className="w-4 h-4 inline mr-1" /> Reboot
+            </button>
+          </>
         )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/5">
-        <div className="flex gap-2">
-          {!isRunning && !isPending && (
-            <ActionBtn
-              onClick={() => startMutation.mutate({ id: instance.id })}
-              loading={startMutation.isPending}
-              icon={<Play className="w-3.5 h-3.5 fill-current" />}
-              color="green"
-              title="Start"
-            />
-          )}
-          {isRunning && (
-            <ActionBtn
-              onClick={() => stopMutation.mutate({ id: instance.id })}
-              loading={stopMutation.isPending}
-              icon={<Square className="w-3.5 h-3.5 fill-current" />}
-              color="yellow"
-              title="Stop"
-            />
-          )}
-          {(isRunning || isError) && (
-            <ActionBtn
-              onClick={() => restartMutation.mutate({ id: instance.id })}
-              loading={restartMutation.isPending}
-              icon={<RotateCw className={`w-3.5 h-3.5 ${restartMutation.isPending ? 'animate-spin' : ''}`} />}
-              color="cyan"
-              title="Restart"
-            />
-          )}
-          <button
-            onClick={() => setShowDetails(v => !v)}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all text-xs flex items-center gap-1"
-            title="Details"
-          >
-            {showDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-        <ActionBtn
-          onClick={handleDelete}
-          loading={deleteMutation.isPending}
-          icon={<Trash2 className="w-3.5 h-3.5" />}
-          color="red"
-          title="Delete"
-        />
-      </div>
-
-      {/* Expanded Details */}
-      <AnimatePresence>
-        {showDetails && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="pt-3 border-t border-white/5 grid grid-cols-2 gap-2 text-xs">
-              <Detail label="ID" value={instance.id.slice(0, 12) + '…'} mono />
-              <Detail label="SSH Port" value={instance.sshPort || '22'} mono />
-              <Detail label="SSH User" value={instance.sshUsername || 'root'} mono />
-              <Detail label="Created" value={new Date(instance.createdAt).toLocaleDateString()} />
-              {instance.startedAt && <Detail label="Started" value={new Date(instance.startedAt).toLocaleTimeString()} />}
-              <Detail label="Tags" value={instance.tags?.join(', ') || '—'} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-});
-
-function ActionBtn({ onClick, loading, icon, color, title }: { onClick: () => void; loading?: boolean; icon: React.ReactNode; color: 'green' | 'yellow' | 'cyan' | 'red'; title: string }) {
-  const colors = {
-    green: "bg-[#00ff88]/10 text-[#00ff88] hover:bg-[#00ff88]/20 hover:shadow-[0_0_12px_rgba(0,255,136,0.25)]",
-    yellow: "bg-[#ffb800]/10 text-[#ffb800] hover:bg-[#ffb800]/20 hover:shadow-[0_0_12px_rgba(255,184,0,0.25)]",
-    cyan: "bg-primary/10 text-primary hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(0,212,255,0.25)]",
-    red: "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:shadow-[0_0_12px_rgba(255,51,102,0.25)]",
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      title={title}
-      className={`p-2 rounded-lg transition-all duration-150 disabled:opacity-40 ${colors[color]}`}
-    >
-      {icon}
-    </button>
-  );
-}
-
-function Detail({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
-  return (
-    <div className="bg-background/30 rounded-lg px-2.5 py-2">
-      <p className="text-muted-foreground/60 mb-0.5 uppercase tracking-wider text-[10px]">{label}</p>
-      <p className={`text-foreground/80 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-primary' : 'bg-white/10'}`}
-      aria-label={label}
-    >
-      <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 my-0.5 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
-    </button>
-  );
-}
-
-function CreateInstanceForm({ caps, onSuccess }: { caps: any; onSuccess: () => void }) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const [form, setForm] = useState({
-    name: "",
-    type: "docker" as "kvm" | "docker" | "lxc",
-    os: "ubuntu-22.04",
-    cpuCores: 2,
-    memoryMb: 2048,
-    diskGb: 20,
-    hasPublicIpv4: true,
-    sshUsername: "root",
-    sshKey: "",
-    hostname: "",
-    timezone: "UTC",
-    autoStart: false,
-    tags: "",
-  });
-
-  const set = useCallback(<K extends keyof typeof form>(k: K, v: typeof form[K]) =>
-    setForm(f => ({ ...f, [k]: v })), []);
-
-  const createMutation = useCreateInstance({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Instance Provisioned", description: `${form.name} is being initialized.` });
-        queryClient.invalidateQueries({ queryKey: getListInstancesQueryKey() });
-        onSuccess();
-      },
-      onError: (err: any) => {
-        toast({ title: "Provisioning Failed", description: err?.message || "Check constraints.", variant: "destructive" });
-      }
-    }
-  });
-
-  const isTypeSupported = useCallback((type: string) => {
-    if (!caps) return true;
-    if (type === "kvm") return caps.kvm;
-    if (type === "docker") return caps.docker;
-    return true;
-  }, [caps]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isTypeSupported(form.type)) return;
-    createMutation.mutate({
-      data: {
-        name: form.name,
-        type: form.type,
-        os: form.os,
-        cpuCores: form.cpuCores,
-        memoryMb: form.memoryMb,
-        diskGb: form.diskGb,
-        tags: form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        // @ts-ignore extra fields
-        hasPublicIpv4: form.hasPublicIpv4,
-        sshUsername: form.sshUsername,
-        hostname: form.hostname || form.name,
-        timezone: form.timezone,
-        autoStart: form.autoStart,
-      }
-    });
-  };
-
-  return (
-    <div className="flex flex-col bg-background overflow-hidden">
-      <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/10 bg-card/50 shrink-0">
-        <DialogTitle className="text-xl font-display font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-          Deploy New Instance
-        </DialogTitle>
-        <p className="text-muted-foreground text-sm mt-1">Configure and provision a new virtual environment.</p>
-      </DialogHeader>
-
-      <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-5">
-        {/* Row 1: Name + Type */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Instance Name">
-            <input
-              required
-              autoFocus
-              value={form.name}
-              onChange={e => set("name", e.target.value)}
-              placeholder="prod-web-01"
-              className="form-input font-mono"
-            />
-          </FormField>
-          <FormField label="Runtime Type">
-            <select value={form.type} onChange={e => set("type", e.target.value as any)} className="form-input font-mono appearance-none">
-              {(["kvm", "docker", "lxc"] as const).map(t => (
-                <option key={t} value={t} disabled={!isTypeSupported(t)}>
-                  {t.toUpperCase()} {!isTypeSupported(t) ? "(Not Supported)" : ""}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-
-        {/* Row 2: OS + Hostname */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Operating System">
-            <select value={form.os} onChange={e => set("os", e.target.value)} className="form-input appearance-none">
-              {OS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Hostname (optional)">
-            <input
-              value={form.hostname}
-              onChange={e => set("hostname", e.target.value)}
-              placeholder={form.name || "my-server"}
-              className="form-input font-mono"
-            />
-          </FormField>
-        </div>
-
-        {/* Row 3: SSH User + Timezone */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="SSH Username">
-            <input
-              value={form.sshUsername}
-              onChange={e => set("sshUsername", e.target.value)}
-              placeholder="root"
-              className="form-input font-mono"
-            />
-          </FormField>
-          <FormField label="Timezone">
-            <select value={form.timezone} onChange={e => set("timezone", e.target.value)} className="form-input appearance-none">
-              {TIMEZONE_OPTIONS.map(tz => <option key={tz} value={tz}>{tz}</option>)}
-            </select>
-          </FormField>
-        </div>
-
-        {/* SSH Public Key */}
-        <FormField label="SSH Public Key (optional)">
-          <textarea
-            value={form.sshKey}
-            onChange={e => set("sshKey", e.target.value)}
-            rows={2}
-            placeholder="ssh-ed25519 AAAA... user@host"
-            className="form-input font-mono resize-none text-xs"
-          />
-        </FormField>
-
-        {/* Tags */}
-        <FormField label="Tags (comma-separated)">
-          <input
-            value={form.tags}
-            onChange={e => set("tags", e.target.value)}
-            placeholder="production, web, api"
-            className="form-input"
-          />
-        </FormField>
-
-        {/* Resource Sliders */}
-        <div className="space-y-4 border border-white/5 rounded-xl p-4 bg-background/30">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Resource Allocation</p>
-          <Slider label="vCPU Cores" value={form.cpuCores} min={1} max={32} step={1} color="primary" display={`${form.cpuCores} Cores`} onChange={v => set("cpuCores", v)} />
-          <Slider label="Memory (RAM)" value={form.memoryMb} min={128} max={32768} step={128} color="secondary" display={`${(form.memoryMb / 1024).toFixed(1)} GB`} onChange={v => set("memoryMb", v)} />
-          <Slider label="Storage (Disk)" value={form.diskGb} min={5} max={500} step={5} color="accent" display={`${form.diskGb} GB`} onChange={v => set("diskGb", v)} />
-        </div>
-
-        {/* Toggles */}
-        <div className="space-y-3 border border-white/5 rounded-xl p-4 bg-background/30">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Network & Boot Options</p>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Globe className="w-4 h-4 text-primary" /> Public IPv4
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Assign a routable public IP address</p>
-            </div>
-            <Toggle checked={form.hasPublicIpv4} onChange={v => set("hasPublicIpv4", v)} label="Public IPv4" />
-          </div>
-
-          {!form.hasPublicIpv4 && (
-            <div className="flex items-start gap-2 p-2.5 bg-[#f48120]/5 border border-[#f48120]/20 rounded-lg text-xs text-[#f48120]">
-              <CloudLightning className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>No public IP — you can activate a Cloudflare Tunnel after deployment for external access.</span>
-            </div>
-          )}
-
-          {!caps?.publicIpv4 && form.hasPublicIpv4 && (
-            <div className="flex items-start gap-2 p-2.5 bg-yellow-500/5 border border-yellow-500/20 rounded-lg text-xs text-yellow-400">
-              <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>Host has no public IPv4 — the instance may not be externally reachable.</span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-t border-white/5 pt-3">
-            <div>
-              <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-secondary" /> Auto-start on Boot
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Start this instance automatically when host reboots</p>
-            </div>
-            <Toggle checked={form.autoStart} onChange={v => set("autoStart", v)} label="Auto-start" />
-          </div>
-        </div>
-
-        {/* Type warning */}
-        {!isTypeSupported(form.type) && (
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-xs text-destructive">
-            <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
-            <span><strong>{form.type.toUpperCase()}</strong> is not supported on this host. Select a different runtime type.</span>
-          </div>
-        )}
-
         <button
-          type="submit"
-          disabled={createMutation.isPending || !isTypeSupported(form.type)}
-          className="w-full py-3.5 rounded-xl font-bold bg-gradient-to-r from-primary to-blue-500 text-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,212,255,0.35)] hover:shadow-[0_0_30px_rgba(0,212,255,0.55)] hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          onClick={handleDelete}
+          className="flex-1 py-2 rounded-lg border border-destructive/30 text-xs uppercase tracking-widest text-destructive hover:border-destructive hover:bg-destructive/10 transition-colors"
         >
-          {createMutation.isPending ? "Provisioning…" : "Deploy Environment"}
+          <Trash2 className="w-4 h-4 inline mr-1" /> Delete
         </button>
-      </form>
-    </div>
-  );
-}
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Slider({ label, value, min, max, step, color, display, onChange }: {
-  label: string; value: number; min: number; max: number; step: number;
-  color: string; display: string; onChange: (v: number) => void;
-}) {
-  return (
-    <div>
-      <div className="flex justify-between mb-1.5">
-        <span className={`text-xs font-semibold uppercase tracking-wide text-${color}`}>{label}</span>
-        <span className={`font-mono text-xs font-bold text-${color}`}>{display}</span>
       </div>
-      <input
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(parseInt(e.target.value))}
-        className={`w-full h-1.5 rounded-full appearance-none bg-white/10 accent-${color} cursor-pointer`}
-      />
     </div>
+  );
+}
+
+function CreateVpsForm({ onSuccess }: { onSuccess: () => void }) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>([]);
+  const [mounts, setMounts] = useState<any[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<string>("");
+  const [name, setName] = useState("");
+  const [cpu, setCpu] = useState(1);
+  const [ram, setRam] = useState(256);
+  const [disk, setDisk] = useState(2);
+  const [image, setImage] = useState("");
+  const [storagePath, setStoragePath] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [driversRes, imagesRes, storageRes] = await Promise.all([
+          api.get("/api/drivers"),
+          api.get("/api/images"),
+          api.get("/api/storage"),
+        ]);
+        const driversList = driversRes.data?.data?.drivers || [];
+        setDrivers(driversList);
+        const recommended = driversList.find((d: any) => d.available)?.id || "";
+        setSelectedDriver(recommended);
+        setImages(imagesRes.data?.data?.images || []);
+        const mountsList = storageRes.data?.data?.mounts || [];
+        setMounts(mountsList);
+        const recommendedMount = mountsList.find((m: any) => m.recommended)?.path || "";
+        setStoragePath(recommendedMount);
+      } catch (err) {
+        toast({ title: "Failed to load options", variant: "destructive" });
+      }
+    };
+    loadOptions();
+  }, [toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post("/api/vps", {
+        name,
+        cpu,
+        ram_mb: ram,
+        disk_gb: disk,
+        image,
+        technology: selectedDriver,
+        storage_path: storagePath,
+        expires_at: expiresAt || null,
+      });
+      toast({ title: "VPS created successfully" });
+      onSuccess();
+    } catch (err: any) {
+      toast({
+        title: err?.response?.data?.error || "Failed to create VPS",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form className="px-6 pb-6 space-y-5" onSubmit={handleSubmit}>
+      <div className="space-y-2">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Name</label>
+        <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <label className="text-xs uppercase tracking-widest text-muted-foreground">CPU</label>
+          <input type="number" min={1} max={16} className="form-input" value={cpu} onChange={(e) => setCpu(Number(e.target.value))} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs uppercase tracking-widest text-muted-foreground">RAM (MB)</label>
+          <input type="number" min={128} max={32768} className="form-input" value={ram} onChange={(e) => setRam(Number(e.target.value))} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs uppercase tracking-widest text-muted-foreground">Disk (GB)</label>
+          <input type="number" min={1} max={500} className="form-input" value={disk} onChange={(e) => setDisk(Number(e.target.value))} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Image</label>
+        <select className="form-input" value={image} onChange={(e) => setImage(e.target.value)} required>
+          <option value="">Select image</option>
+          {images.map((img) => (
+            <option key={img.slug} value={img.slug}>
+              {img.display_name} ({img.size_gb} GB)
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-3">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Technology</label>
+        <TechSelector drivers={drivers} selected={selectedDriver} onSelect={setSelectedDriver} />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Storage Path</label>
+        <select className="form-input" value={storagePath} onChange={(e) => setStoragePath(e.target.value)} required>
+          <option value="">Select storage</option>
+          {mounts.map((m) => (
+            <option key={m.path} value={m.path}>
+              {m.path} — {m.free_gb} GB free{m.recommended ? " (RECOMMENDED)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Expiry (optional)</label>
+        <input type="datetime-local" className="form-input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,212,255,0.35)] hover:bg-primary/90 transition-all disabled:opacity-50"
+      >
+        {loading ? "Provisioning…" : "Create VPS"}
+      </button>
+    </form>
   );
 }

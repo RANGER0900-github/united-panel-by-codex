@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import Instances from "@/pages/instances";
+import VpsDetail from "@/pages/vps-detail";
 import Host from "@/pages/host";
 import Logs from "@/pages/logs";
 import Installer from "@/pages/installer";
@@ -40,6 +41,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/instances" component={Instances} />
+        <Route path="/vps/:id" component={VpsDetail} />
         <Route path="/host" component={Host} />
         <Route path="/logs" component={Logs} />
         <Route path="/installer" component={Installer} />
