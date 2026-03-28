@@ -28,6 +28,6 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P2.22 — server/routes/images.js
 [x] P2.23 — server/routes/storage.js
 [x] P2.24 — server/routes/vps.js
-[ ] P2.25 — server/routes/logs.js
+[x] P2.25 — server/routes/logs.js
 [ ] P2.26 — server/index.js
 [ ] P2.27 — Smoke test
