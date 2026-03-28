@@ -17,7 +17,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P2.11 — server/drivers/sysbox.js
 [x] P2.12 — server/drivers/qemu_tcg.js
 [x] P2.13 — server/services/metrics.js
-[ ] P2.14 — server/services/imageManager.js
+[x] P2.14 — server/services/imageManager.js
 [ ] P2.15 — server/services/storageManager.js
 [ ] P2.16 — server/services/networkManager.js
 [ ] P2.17 — server/services/expiry.js
