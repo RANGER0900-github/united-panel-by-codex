@@ -21,7 +21,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
+    const isLogin = error?.config?.url?.includes("/api/auth/login");
+    if (error?.response?.status === 401 && !isLogin) {
       clearToken();
       window.location.href = "/login";
     }
