@@ -69,3 +69,5 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] B10 — Delete VPS
 [x] B11 — Mobile viewport
 [x] B12 — Zero console errors
+[x] P6.1 — Write install.sh
+[x] P6.2 — Syntax check install.sh
