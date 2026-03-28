@@ -295,6 +295,36 @@ echo "admin:$ADMIN_PASS" > "$INSTALL_DIR/config/credentials.txt"
 chmod 600 "$INSTALL_DIR/config/credentials.txt"
 ok "Config generated"
 
+# Sync admin credentials into database
+if [ -f "$INSTALL_DIR/server/node_modules/bcryptjs" ] || [ -d "$INSTALL_DIR/server/node_modules/bcryptjs" ]; then
+  (cd "$INSTALL_DIR/server" && ADMIN_PASS="$ADMIN_PASS" INSTALL_DIR="$INSTALL_DIR" node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const crypto = require("crypto");
+    const bcrypt = require("bcryptjs");
+    const Database = require("better-sqlite3");
+    const installDir = process.env.INSTALL_DIR;
+    const configPath = path.join(installDir, "config", "config.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const schemaPath = path.join(installDir, "server", "db", "schema.sql");
+    const schema = fs.readFileSync(schemaPath, "utf8");
+    const db = new Database(config.db_path);
+    db.exec(schema);
+    const hash = bcrypt.hashSync(process.env.ADMIN_PASS, 10);
+    const existing = db.prepare("SELECT id FROM users WHERE username = ?").get("admin");
+    if (existing) {
+      db.prepare("UPDATE users SET password_hash = ? WHERE username = ?").run(hash, "admin");
+    } else {
+      db.prepare("INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?,?,?,?,?)")
+        .run(crypto.randomUUID(), "admin", hash, "admin", Math.floor(Date.now() / 1000));
+    }
+    db.close();
+  ')
+  ok "Admin credentials synced to database"
+else
+  warn "bcryptjs not available; admin credentials not synced."
+fi
+
 # ── SECTION 10: NETWORK DETECTION ────────────────────────────
 log "Detecting network mode..."
 MY_IP=$(curl -s --max-time 5 https://ifconfig.io 2>/dev/null || echo "")
