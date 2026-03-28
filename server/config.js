@@ -11,9 +11,13 @@ function loadFromFile(filePath) {
 }
 
 let rawConfig = loadFromFile(primaryPath);
+let configSource = rawConfig ? "primary" : "env";
 
 if (!rawConfig) {
   rawConfig = loadFromFile(devPath);
+  if (rawConfig) {
+    configSource = "dev";
+  }
 }
 
 if (!rawConfig) {
@@ -34,7 +38,9 @@ const config = {
   log_level: rawConfig.log_level || "info",
 };
 
-if (!config.jwt_secret || config.jwt_secret === "dev-secret-change-in-production") {
+const insecureSecrets = new Set(["dev-secret-change-in-production"]);
+
+if (!config.jwt_secret || (configSource !== "dev" && insecureSecrets.has(config.jwt_secret))) {
   throw new Error(
     "Missing or insecure jwt_secret. Set a strong secret in config.json or JWT_SECRET.",
   );
