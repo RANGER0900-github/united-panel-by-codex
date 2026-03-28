@@ -35,7 +35,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P3.2 — Create API client
 [x] P3.3 — Create .env files
 [x] P3.4 — Wire auth
-[ ] P3.5 — Wire dashboard metrics
+[x] P3.5 — Wire dashboard metrics
 [ ] P3.6 — Wire VPS list
 [ ] P3.7 — Technology selector component
 [ ] P3.8 — Wire create VPS wizard/modal

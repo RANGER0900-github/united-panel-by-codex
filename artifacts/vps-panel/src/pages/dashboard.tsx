@@ -1,33 +1,79 @@
-import React, { useMemo, memo } from "react";
+import React, { useMemo, memo, useEffect, useState } from "react";
 import { PageTransition } from "@/components/page-transition";
-import {
-  useGetMetrics,
-  useGetMetricsHistory,
-  useListInstances,
-  useHealthCheck
-} from "@workspace/api-client-react";
+import { api, connectSocket } from "@/api/client";
 import { Cpu, HardDrive, MemoryStick, Activity, Server, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
-  const { data: health } = useHealthCheck({ query: { refetchInterval: 30000 } });
-  const { data: metrics } = useGetMetrics({ query: { refetchInterval: 8000 } });
-  const { data: history } = useGetMetricsHistory({ limit: 60 }, { query: { refetchInterval: 15000, staleTime: 10000 } });
-  const { data: instancesData } = useListInstances({ query: { refetchInterval: 30000, staleTime: 20000 } });
+  const [health, setHealth] = useState<any>(null);
+  const [metrics, setMetrics] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [instances, setInstances] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchHealth = async () => {
+      try {
+        const response = await api.get("/api/health");
+        setHealth({ status: "ok", uptime: response.data?.data?.uptime });
+      } catch (err) {
+        console.error("Failed to load health", err);
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchHost = async () => {
+      try {
+        const response = await api.get("/api/host");
+        setMetrics(response.data?.data);
+      } catch (err) {
+        console.error("Failed to load host metrics", err);
+      }
+    };
+    fetchHost();
+    const interval = setInterval(fetchHost, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchVps = async () => {
+      try {
+        const response = await api.get("/api/vps");
+        setInstances(response.data?.data || []);
+      } catch (err) {
+        console.error("Failed to load instances", err);
+      }
+    };
+    fetchVps();
+    const interval = setInterval(fetchVps, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const socket = connectSocket();
+    socket.on("metrics", (data: any) => {
+      setMetrics(data);
+      setHistory((prev) => [...prev, { ...data, timestamp: Date.now() }].slice(-60));
+    });
+    return () => socket.disconnect();
+  }, []);
 
   const chartData = useMemo(() => {
-    if (!history?.dataPoints) return [];
-    return history.dataPoints.map(pt => ({
+    if (!history?.length) return [];
+    return history.map(pt => ({
       ...pt,
       time: format(new Date(pt.timestamp), 'HH:mm')
     }));
-  }, [history?.dataPoints]);
+  }, [history]);
 
   const runningInstances = useMemo(
-    () => instancesData?.instances.filter(i => i.status === 'running').length || 0,
-    [instancesData?.instances]
+    () => instances.filter(i => i.status === 'RUNNING').length || 0,
+    [instances]
   );
 
   return (
@@ -56,10 +102,10 @@ export default function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard title="CPU Usage" value={`${metrics?.cpuPercent.toFixed(1) ?? 0}%`} icon={Cpu} color="text-primary" progress={metrics?.cpuPercent ?? 0} delay={0.05} colorClass="bg-primary" />
-          <MetricCard title="Memory Usage" value={`${metrics?.memoryPercent.toFixed(1) ?? 0}%`} subtitle={`${metrics?.memoryUsedMb ?? 0} / ${metrics?.memoryTotalMb ?? 0} MB`} icon={MemoryStick} color="text-secondary" progress={metrics?.memoryPercent ?? 0} delay={0.1} colorClass="bg-secondary" />
-          <MetricCard title="Disk Usage" value={`${metrics?.diskPercent.toFixed(1) ?? 0}%`} subtitle={`${metrics?.diskUsedGb ?? 0} / ${metrics?.diskTotalGb ?? 0} GB`} icon={HardDrive} color="text-accent" progress={metrics?.diskPercent ?? 0} delay={0.15} colorClass="bg-accent" />
-          <MetricCard title="Network Rx/Tx" value={`${((metrics?.networkRxBps ?? 0) / 1048576).toFixed(2)} MB/s`} subtitle={`Tx: ${((metrics?.networkTxBps ?? 0) / 1048576).toFixed(2)} MB/s`} icon={Activity} color="text-[#00ff88]" progress={0} delay={0.2} colorClass="bg-[#00ff88]" hideProgress />
+          <MetricCard title="CPU Usage" value={`${metrics?.cpu_percent?.toFixed(1) ?? 0}%`} icon={Cpu} color="text-primary" progress={metrics?.cpu_percent ?? 0} delay={0.05} colorClass="bg-primary" />
+          <MetricCard title="Memory Usage" value={`${((metrics?.ram_used_mb ?? 0) / Math.max(metrics?.ram_total_mb ?? 1, 1) * 100).toFixed(1)}%`} subtitle={`${metrics?.ram_used_mb ?? 0} / ${metrics?.ram_total_mb ?? 0} MB`} icon={MemoryStick} color="text-secondary" progress={((metrics?.ram_used_mb ?? 0) / Math.max(metrics?.ram_total_mb ?? 1, 1)) * 100} delay={0.1} colorClass="bg-secondary" />
+          <MetricCard title="Disk Usage" value={`${((metrics?.disk_used_gb ?? 0) / Math.max(metrics?.disk_total_gb ?? 1, 1) * 100).toFixed(1)}%`} subtitle={`${metrics?.disk_used_gb ?? 0} / ${metrics?.disk_total_gb ?? 0} GB`} icon={HardDrive} color="text-accent" progress={((metrics?.disk_used_gb ?? 0) / Math.max(metrics?.disk_total_gb ?? 1, 1)) * 100} delay={0.15} colorClass="bg-accent" />
+          <MetricCard title="Network Rx/Tx" value={`${((metrics?.net_rx_bps ?? 0) / 1048576).toFixed(2)} MB/s`} subtitle={`Tx: ${((metrics?.net_tx_bps ?? 0) / 1048576).toFixed(2)} MB/s`} icon={Activity} color="text-[#00ff88]" progress={0} delay={0.2} colorClass="bg-[#00ff88]" hideProgress />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -117,7 +163,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-background/50 rounded-xl p-4 border border-white/5">
                 <p className="text-muted-foreground text-sm font-medium">Total VPS</p>
-                <p className="text-3xl font-bold font-mono mt-2">{instancesData?.total ?? 0}</p>
+                <p className="text-3xl font-bold font-mono mt-2">{instances.length ?? 0}</p>
               </div>
               <div className="bg-background/50 rounded-xl p-4 border border-primary/20 shadow-[inset_0_0_20px_rgba(0,212,255,0.05)]">
                 <p className="text-primary text-sm font-medium">Running</p>
@@ -142,10 +188,10 @@ export default function Dashboard() {
               )}
             </div>
             <div className="space-y-2">
-              {instancesData?.instances.slice(0, 3).map(inst => (
+              {instances.slice(0, 3).map(inst => (
                 <div key={inst.id} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
                   <span className="text-sm font-mono text-foreground/80 truncate flex-1">{inst.name}</span>
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ml-2 ${inst.status === 'running' ? 'bg-[#00ff88]' : 'bg-muted-foreground'}`} />
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ml-2 ${inst.status === 'RUNNING' ? 'bg-[#00ff88]' : 'bg-muted-foreground'}`} />
                 </div>
               ))}
             </div>
