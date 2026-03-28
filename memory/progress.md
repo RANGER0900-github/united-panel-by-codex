@@ -4,7 +4,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P0.2 — Read every file found
 [x] P0.3 — Write memory/recon.md
 [x] P1.1 — Write memory/architecture.md
-[ ] P2.1 — server/db/schema.sql
+[x] P2.1 — server/db/schema.sql
 [ ] P2.2 — server/db/database.js
 [ ] P2.3 — server/config.js
 [ ] P2.4 — server/middleware/validate.js
