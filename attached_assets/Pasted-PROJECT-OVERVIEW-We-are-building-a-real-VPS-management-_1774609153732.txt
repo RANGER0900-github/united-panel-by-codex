@@ -1,0 +1,109 @@
+PROJECT OVERVIEW
+
+We are building a real VPS management panel for nested VPS instances running on top of a rented Linux host.
+
+The product includes:
+- a web dashboard
+- backend APIs
+- a one-line installer.sh
+- boot auto-start support
+- host capability detection
+- compatibility-aware UI
+- logs, health checks, and fallback logic
+
+The goal is not a mockup. The goal is a working system that can be installed locally, tested locally, debugged properly, and then deployed.
+
+PROJECT GOALS
+
+- Build a production-grade VPS panel
+- Make installer.sh work as a real one-command installer
+- Auto-detect host capabilities and install only what is needed
+- Start automatically on boot
+- Fall back cleanly when a feature is missing
+- Make unsupported actions disabled and clearly labeled in the UI
+- Keep logs structured and useful
+- Fix issues by reproducing them, not guessing
+
+PLANNING RULES
+
+Before coding:
+1. Inspect the repository completely.
+2. Identify the actual stack, entry points, scripts, services, and config files.
+3. Summarize the current architecture in short bullets.
+4. Identify missing pieces for:
+   - installer.sh
+   - boot startup
+   - host detection
+   - compatibility logic
+   - backend APIs
+   - frontend UI
+   - logs and health checks
+5. Make a step-by-step implementation plan.
+6. Then execute one step at a time.
+
+EXECUTION ORDER
+
+1. Understand repo structure
+2. Identify build/run commands
+3. Find current bugs and broken flows
+4. Implement installer.sh or improve it
+5. Implement host detection
+6. Implement fallback startup logic
+7. Implement backend routes
+8. Implement UI compatibility states
+9. Make unsupported features disabled in the UI
+10. Add logs and health checks
+11. Run local tests
+12. Fix failures
+13. Retest
+14. Repeat until stable
+
+COMPATIBILITY REQUIREMENTS
+
+- Detect systemd availability
+- Detect public IPv4 usability
+- Detect KVM availability
+- Detect Docker availability
+- Detect usable mount points
+- Detect virtualization/container support
+
+UI RULES
+
+- If a feature is not supported on the host:
+  - disable it
+  - make it unclickable
+  - show “Not compatible with this host”
+- Show the detected host mode clearly
+- Show the selected startup mode clearly
+- Show the selected access mode clearly
+
+TESTING RULES
+
+- Test installer behavior locally first
+- Test boot-start logic
+- Test fallback paths
+- Test API routes
+- Test UI states
+- Test disabled states
+- Test log output
+- Test error handling
+- Reproduce each issue before fixing it
+- After each fix, retest immediately
+
+OUTPUT FORMAT
+
+When responding, always give:
+- current repo understanding
+- implementation plan
+- what changed
+- what was tested
+- what still fails
+- exact commands used
+
+IMPORTANT
+
+- Do not jump straight into coding without inspection
+- Do not assume stack details
+- Do not guess when logs or tests can confirm
+- Do not leave critical flows half-finished
+- Prefer small, deterministic fixes

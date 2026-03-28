@@ -1,0 +1,633 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: VPS Management Panel API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: host
+    description: Host capability detection
+  - name: instances
+    description: VPS instance management
+  - name: logs
+    description: System logs
+  - name: metrics
+    description: System metrics
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /host/capabilities:
+    get:
+      operationId: getHostCapabilities
+      tags: [host]
+      summary: Get host capabilities
+      description: Detect and return host system capabilities
+      responses:
+        "200":
+          description: Host capabilities detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostCapabilities"
+
+  /host/info:
+    get:
+      operationId: getHostInfo
+      tags: [host]
+      summary: Get host information
+      description: Returns host system information
+      responses:
+        "200":
+          description: Host info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostInfo"
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [metrics]
+      summary: Get system metrics
+      description: Returns current CPU, memory, disk, and network metrics
+      responses:
+        "200":
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemMetrics"
+
+  /metrics/history:
+    get:
+      operationId: getMetricsHistory
+      tags: [metrics]
+      summary: Get metrics history
+      description: Returns historical metrics data points
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 60
+      responses:
+        "200":
+          description: Metrics history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsHistory"
+
+  /instances:
+    get:
+      operationId: listInstances
+      tags: [instances]
+      summary: List VPS instances
+      description: Returns all VPS instances
+      responses:
+        "200":
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceList"
+    post:
+      operationId: createInstance
+      tags: [instances]
+      summary: Create a VPS instance
+      description: Create a new VPS instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstanceRequest"
+      responses:
+        "201":
+          description: Instance created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /instances/{id}:
+    get:
+      operationId: getInstance
+      tags: [instances]
+      summary: Get a VPS instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteInstance
+      tags: [instances]
+      summary: Delete a VPS instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /instances/{id}/start:
+    post:
+      operationId: startInstance
+      tags: [instances]
+      summary: Start a VPS instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Already running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /instances/{id}/stop:
+    post:
+      operationId: stopInstance
+      tags: [instances]
+      summary: Stop a VPS instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /instances/{id}/restart:
+    post:
+      operationId: restartInstance
+      tags: [instances]
+      summary: Restart a VPS instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance restarted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instance"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /instances/{id}/metrics:
+    get:
+      operationId: getInstanceMetrics
+      tags: [instances]
+      summary: Get instance metrics
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Instance metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemMetrics"
+
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get system logs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+        - name: instanceId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogList"
+
+  /installer/script:
+    get:
+      operationId: getInstallerScript
+      tags: [health]
+      summary: Get installer shell script
+      description: Returns the one-line installer shell script
+      responses:
+        "200":
+          description: Installer script content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallerScript"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        uptime:
+          type: number
+        timestamp:
+          type: string
+      required:
+        - status
+
+    HostCapabilities:
+      type: object
+      properties:
+        systemd:
+          type: boolean
+        kvm:
+          type: boolean
+        docker:
+          type: boolean
+        publicIpv4:
+          type: boolean
+        virtualization:
+          type: boolean
+        mountPoints:
+          type: array
+          items:
+            type: string
+        detectedAt:
+          type: string
+        hostMode:
+          type: string
+          enum: [bare-metal, vm, container, unknown]
+        startupMode:
+          type: string
+          enum: [systemd, init, manual]
+        accessMode:
+          type: string
+          enum: [direct, nat, none]
+      required:
+        - systemd
+        - kvm
+        - docker
+        - publicIpv4
+        - virtualization
+        - mountPoints
+        - detectedAt
+        - hostMode
+        - startupMode
+        - accessMode
+
+    HostInfo:
+      type: object
+      properties:
+        hostname:
+          type: string
+        os:
+          type: string
+        kernel:
+          type: string
+        arch:
+          type: string
+        cpuCount:
+          type: integer
+        totalMemoryMb:
+          type: integer
+        totalDiskGb:
+          type: number
+        publicIp:
+          type: string
+        uptime:
+          type: number
+      required:
+        - hostname
+        - os
+        - kernel
+        - arch
+        - cpuCount
+        - totalMemoryMb
+        - totalDiskGb
+        - uptime
+
+    SystemMetrics:
+      type: object
+      properties:
+        cpuPercent:
+          type: number
+        memoryPercent:
+          type: number
+        memoryUsedMb:
+          type: integer
+        memoryTotalMb:
+          type: integer
+        diskPercent:
+          type: number
+        diskUsedGb:
+          type: number
+        diskTotalGb:
+          type: number
+        networkRxBps:
+          type: number
+        networkTxBps:
+          type: number
+        timestamp:
+          type: string
+      required:
+        - cpuPercent
+        - memoryPercent
+        - memoryUsedMb
+        - memoryTotalMb
+        - diskPercent
+        - diskUsedGb
+        - diskTotalGb
+        - networkRxBps
+        - networkTxBps
+        - timestamp
+
+    MetricsDataPoint:
+      type: object
+      properties:
+        cpuPercent:
+          type: number
+        memoryPercent:
+          type: number
+        networkRxBps:
+          type: number
+        networkTxBps:
+          type: number
+        timestamp:
+          type: string
+      required:
+        - cpuPercent
+        - memoryPercent
+        - networkRxBps
+        - networkTxBps
+        - timestamp
+
+    MetricsHistory:
+      type: object
+      properties:
+        dataPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricsDataPoint"
+      required:
+        - dataPoints
+
+    Instance:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [running, stopped, starting, stopping, error]
+        cpuCores:
+          type: integer
+        memoryMb:
+          type: integer
+        diskGb:
+          type: number
+        ipAddress:
+          type: string
+        os:
+          type: string
+        createdAt:
+          type: string
+        startedAt:
+          type: string
+        sshPort:
+          type: integer
+        type:
+          type: string
+          enum: [kvm, docker, lxc]
+        tags:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - status
+        - cpuCores
+        - memoryMb
+        - diskGb
+        - os
+        - createdAt
+        - type
+
+    InstanceList:
+      type: object
+      properties:
+        instances:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instance"
+        total:
+          type: integer
+      required:
+        - instances
+        - total
+
+    CreateInstanceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        cpuCores:
+          type: integer
+          minimum: 1
+          maximum: 32
+        memoryMb:
+          type: integer
+          minimum: 128
+        diskGb:
+          type: number
+          minimum: 1
+        os:
+          type: string
+        type:
+          type: string
+          enum: [kvm, docker, lxc]
+        tags:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - cpuCores
+        - memoryMb
+        - diskGb
+        - os
+        - type
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        message:
+          type: string
+        instanceId:
+          type: string
+        source:
+          type: string
+      required:
+        - id
+        - timestamp
+        - level
+        - message
+        - source
+
+    LogList:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+        total:
+          type: integer
+      required:
+        - logs
+        - total
+
+    InstallerScript:
+      type: object
+      properties:
+        script:
+          type: string
+        version:
+          type: string
+        checksum:
+          type: string
+      required:
+        - script
+        - version
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message

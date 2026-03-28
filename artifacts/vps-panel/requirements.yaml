@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For page transitions, micro-interactions, and fluid layout animations"
+  "recharts": "For real-time dashboard analytics charts (CPU, RAM, Network)"
+  "date-fns": "For human-readable date and time formatting in logs and metrics"
+  "clsx": "For conditional tailwind class merging"
+  "tailwind-merge": "For merging tailwind classes without conflicts"
+
+images:
+  - path: "artifacts/vps-panel/public/images/cyber-bg.png"
+    description: "Ultra dark futuristic cyberpunk grid background, deep absolute blacks, subtle glowing cyan and purple nodes, minimal and professional, 8k resolution, suitable for a dark mode dashboard"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using generated Orval React Query hooks from @workspace/api-client-react
+  - Force dark theme for the entire panel to match the cyberpunk aesthetic
+  - Assuming UI polling via TanStack Query refetchInterval for live dashboard updates
