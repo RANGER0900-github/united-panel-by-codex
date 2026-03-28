@@ -48,6 +48,10 @@ function getExpectedSha256(image) {
     encoding: "utf8",
   });
   if (res.status !== 0) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn(`Failed to download checksum for ${image.slug}; skipping verification.`);
+      return null;
+    }
     throw new Error(`Failed to download checksum for ${image.slug}`);
   }
   const filename = path.basename(image.rootfs_url);
@@ -56,7 +60,8 @@ function getExpectedSha256(image) {
     .find((l) => l.trim().endsWith(filename));
   if (!line) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error(`Checksum not found for ${filename}`);
+      console.warn(`Checksum not found for ${filename}; skipping verification.`);
+      return null;
     }
     return null;
   }

@@ -11,6 +11,7 @@ log()  { echo "[$(date '+%H:%M:%S')] $*"; }
 ok()   { echo "[$(date '+%H:%M:%S')] ✓ $*"; }
 warn() { echo "[$(date '+%H:%M:%S')] ⚠ $*"; }
 fail() { echo "[$(date '+%H:%M:%S')] ✗ $*"; exit 1; }
+TUNNEL_URL=""
 
 # ── SECTION 1: PREFLIGHT ─────────────────────────────────────
 log "Checking prerequisites..."
@@ -44,12 +45,7 @@ FREE_KB=$(df / | awk 'NR==2{print $4}')
 
 if [ -f "$INSTALL_DIR/config/config.json" ]; then
   warn "Existing installation detected at $INSTALL_DIR"
-  if [ "${AUTO_UPGRADE:-}" = "1" ]; then
-    ok "AUTO_UPGRADE=1 set; continuing with upgrade."
-  else
-    read -rp "Upgrade? [y/N]: " UPGRADE
-    [ "$UPGRADE" = "y" ] || fail "Aborted."
-  fi
+  ok "Proceeding with in-place upgrade."
 fi
 
 # ── SECTION 2: SYSTEM PACKAGES ───────────────────────────────
@@ -303,33 +299,11 @@ fi
 ok "Config generated"
 
 # Sync admin credentials into database
-if [ -f "$INSTALL_DIR/server/node_modules/bcryptjs" ] || [ -d "$INSTALL_DIR/server/node_modules/bcryptjs" ]; then
-  (cd "$INSTALL_DIR/server" && ADMIN_PASS="$ADMIN_PASS" INSTALL_DIR="$INSTALL_DIR" node -e '
-    const fs = require("fs");
-    const path = require("path");
-    const crypto = require("crypto");
-    const bcrypt = require("bcryptjs");
-    const Database = require("better-sqlite3");
-    const installDir = process.env.INSTALL_DIR;
-    const configPath = path.join(installDir, "config", "config.json");
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    const schemaPath = path.join(installDir, "server", "db", "schema.sql");
-    const schema = fs.readFileSync(schemaPath, "utf8");
-    const db = new Database(config.db_path);
-    db.exec(schema);
-    const hash = bcrypt.hashSync(process.env.ADMIN_PASS, 10);
-    const existing = db.prepare("SELECT id FROM users WHERE username = ?").get("admin");
-    if (existing) {
-      db.prepare("UPDATE users SET password_hash = ? WHERE username = ?").run(hash, "admin");
-    } else {
-      db.prepare("INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?,?,?,?,?)")
-        .run(crypto.randomUUID(), "admin", hash, "admin", Math.floor(Date.now() / 1000));
-    }
-    db.close();
-  ')
+if [ -f "$INSTALL_DIR/server/scripts/set-admin-password.js" ]; then
+  (cd "$INSTALL_DIR" && SILENT=1 node "$INSTALL_DIR/server/scripts/set-admin-password.js" "$ADMIN_PASS")
   ok "Admin credentials synced to database"
 else
-  warn "bcryptjs not available; admin credentials not synced."
+  warn "Admin sync helper missing; admin credentials not synced."
 fi
 
 # ── SECTION 10: NETWORK DETECTION ────────────────────────────
@@ -353,6 +327,40 @@ echo "NETWORK_MODE=$NETWORK_MODE" > "$INSTALL_DIR/config/network.conf"
 echo "PUBLIC_IP=$PUBLIC_IP" >> "$INSTALL_DIR/config/network.conf"
 ok "Network mode: $NETWORK_MODE"
 
+# ── SECTION 10.1: CLOUDFLARED TUNNEL ─────────────────────────
+if [ "$NETWORK_MODE" = "tunnel" ] && command -v cloudflared >/dev/null 2>&1; then
+  if command -v systemctl >/dev/null 2>&1; then
+    cat > /etc/systemd/system/vpspanel-cloudflared.service << EOF
+[Unit]
+Description=VPS Panel Cloudflared Tunnel
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$(command -v cloudflared) tunnel --url http://localhost:3000 --no-autoupdate --logfile $LOG_DIR/cloudflared.log --loglevel info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable vpspanel-cloudflared >/dev/null 2>&1 || true
+    systemctl restart vpspanel-cloudflared
+  else
+    nohup "$(command -v cloudflared)" tunnel --url http://localhost:3000 --no-autoupdate \
+      --logfile "$LOG_DIR/cloudflared.log" --loglevel info >/dev/null 2>&1 &
+  fi
+
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if [ -f "$LOG_DIR/cloudflared.log" ]; then
+      TUNNEL_URL=$(grep -Eo 'https://[^ ]+\.trycloudflare\.com' "$LOG_DIR/cloudflared.log" | tail -n 1 || true)
+      [ -n "$TUNNEL_URL" ] && break
+    fi
+    sleep 1
+  done
+fi
+
 # ── SECTION 11: SYSTEM USER ──────────────────────────────────
 id vpspanel &>/dev/null || useradd -r -s /bin/false -d "$INSTALL_DIR" vpspanel
 # LXC and networking still need root — run as root for now
@@ -365,6 +373,22 @@ if [ -z "$NODE_BIN" ]; then
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
+  if systemctl is-active --quiet vpspanel; then
+    systemctl stop vpspanel || true
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    PIDS=$(lsof -ti tcp:3000 || true)
+    if [ -n "$PIDS" ]; then
+      log "Port 3000 is in use; stopping existing process(es)."
+      kill $PIDS || true
+      sleep 1
+      kill -9 $PIDS || true
+    fi
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -k 3000/tcp >/dev/null 2>&1 || true
+  fi
+
   cat > /etc/systemd/system/vpspanel.service << EOF
 [Unit]
 Description=VPS Management Panel
@@ -416,9 +440,15 @@ echo "════════════════════════�
 if [ "$NETWORK_MODE" = "public" ]; then
   echo "  URL:      http://$PUBLIC_IP:3000"
 else
-  echo "  URL:      http://localhost:3000 (local only)"
+  if [ -n "$TUNNEL_URL" ]; then
+    echo "  URL:      $TUNNEL_URL"
+  else
+    echo "  URL:      http://localhost:3000 (local only)"
+  fi
 fi
 echo "  Credentials: $INSTALL_DIR/config/credentials.txt"
+echo "  Change admin password:"
+echo "  sudo node $INSTALL_DIR/server/scripts/set-admin-password.js NEW_PASSWORD"
 if command -v systemctl >/dev/null 2>&1; then
   echo "  Logs:     journalctl -u vpspanel -f"
   echo "  Status:   systemctl status vpspanel"
@@ -431,8 +461,12 @@ echo "════════════════════════�
 if [ "$NETWORK_MODE" = "tunnel" ]; then
   echo ""
   echo "  ⚠  No public IPv4 detected."
-  echo "  For remote access, run:"
-  echo "  cloudflared tunnel --url http://localhost:3000"
+  if [ -n "$TUNNEL_URL" ]; then
+    echo "  Tunnel URL: $TUNNEL_URL"
+  else
+    echo "  Check tunnel logs: $LOG_DIR/cloudflared.log"
+    echo "  Manual start: cloudflared tunnel --url http://localhost:3000"
+  fi
   echo ""
 fi
 echo "  Install/Upgrade (GitHub):"

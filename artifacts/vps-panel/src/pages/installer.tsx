@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 
 export default function Installer() {
   const [copied, setCopied] = useState(false);
-  const script = `curl -sSL ${window.location.origin}/install.sh | sudo bash`;
+  const script =
+    "curl -fsSL https://raw.githubusercontent.com/RANGER0900-github/united-panel-by-codex/master/install.sh | sudo bash";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(script);
