@@ -381,7 +381,7 @@ EOF
 
   systemctl daemon-reload
   systemctl enable vpspanel
-  systemctl start vpspanel
+  systemctl restart vpspanel
   ok "Service started (systemd)"
 else
   warn "systemctl not available; starting panel in background."
