@@ -8,7 +8,7 @@ SESSION 1 — Sat Mar 28 10:59:31 IST 2026
 [x] P2.2 — server/db/database.js
 [x] P2.3 — server/config.js
 [x] P2.4 — server/middleware/validate.js
-[ ] P2.5 — server/middleware/auth.js
+[x] P2.5 — server/middleware/auth.js
 [ ] P2.6 — server/middleware/rateLimit.js
 [ ] P2.7 — server/middleware/audit.js
 [ ] P2.8 — server/drivers/index.js
