@@ -328,7 +328,7 @@ echo "PUBLIC_IP=$PUBLIC_IP" >> "$INSTALL_DIR/config/network.conf"
 ok "Network mode: $NETWORK_MODE"
 
 # ── SECTION 10.1: CLOUDFLARED TUNNEL ─────────────────────────
-if [ "$NETWORK_MODE" = "tunnel" ] && command -v cloudflared >/dev/null 2>&1; then
+if [ "${START_TUNNEL:-1}" = "1" ] && command -v cloudflared >/dev/null 2>&1; then
   if command -v systemctl >/dev/null 2>&1; then
     cat > /etc/systemd/system/vpspanel-cloudflared.service << EOF
 [Unit]
@@ -440,11 +440,10 @@ echo "════════════════════════�
 if [ "$NETWORK_MODE" = "public" ]; then
   echo "  URL:      http://$PUBLIC_IP:3000"
 else
-  if [ -n "$TUNNEL_URL" ]; then
-    echo "  URL:      $TUNNEL_URL"
-  else
-    echo "  URL:      http://localhost:3000 (local only)"
-  fi
+  echo "  URL:      http://localhost:3000 (local only)"
+fi
+if [ -n "$TUNNEL_URL" ]; then
+  echo "  Tunnel:   $TUNNEL_URL"
 fi
 echo "  Credentials: $INSTALL_DIR/config/credentials.txt"
 echo "  Change admin password:"
@@ -461,9 +460,7 @@ echo "════════════════════════�
 if [ "$NETWORK_MODE" = "tunnel" ]; then
   echo ""
   echo "  ⚠  No public IPv4 detected."
-  if [ -n "$TUNNEL_URL" ]; then
-    echo "  Tunnel URL: $TUNNEL_URL"
-  else
+  if [ -z "$TUNNEL_URL" ]; then
     echo "  Check tunnel logs: $LOG_DIR/cloudflared.log"
     echo "  Manual start: cloudflared tunnel --url http://localhost:3000"
   fi
