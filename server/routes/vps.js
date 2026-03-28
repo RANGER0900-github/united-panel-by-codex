@@ -36,12 +36,13 @@ function createVpsRouter(io, driverRegistry) {
       return res.status(400).json({ success: false, error: "Insufficient RAM" });
     }
 
-    if (!storageManager.validatePath(storage_path, disk_gb)) {
+    if (storage_path && !storageManager.validatePath(storage_path, disk_gb)) {
       return res.status(400).json({ success: false, error: "Invalid storage path" });
     }
 
     const id = uuidv4();
-    const diskPath = storageManager.provisionStorage(id, storage_path);
+    const baseStorage = storage_path || path.resolve(process.cwd(), "data");
+    const diskPath = storageManager.provisionStorage(id, baseStorage);
     const imagePath = ensureImage(image);
     const now = Math.floor(Date.now() / 1000);
 

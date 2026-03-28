@@ -47,6 +47,7 @@ function listMounts() {
 }
 
 function validatePath(storagePath, requiredGb) {
+  if (!storagePath) return true;
   const mounts = listMounts();
   const target = mounts.find((m) => storagePath.startsWith(m.path));
   if (!target) return false;
@@ -54,9 +55,20 @@ function validatePath(storagePath, requiredGb) {
 }
 
 function provisionStorage(vpsId, basePath) {
-  const root = path.join(basePath, "vpspanel-data", vpsId);
-  fs.mkdirSync(root, { recursive: true });
-  return root;
+  const resolvedBase = basePath || path.resolve(process.cwd(), "data");
+  const root = path.join(resolvedBase, "vpspanel-data", vpsId);
+  try {
+    fs.mkdirSync(root, { recursive: true });
+    return root;
+  } catch (err) {
+    if (err.code === "EACCES") {
+      const fallbackBase = path.resolve(process.cwd(), "data");
+      const fallbackRoot = path.join(fallbackBase, "vpspanel-data", vpsId);
+      fs.mkdirSync(fallbackRoot, { recursive: true });
+      return fallbackRoot;
+    }
+    throw err;
+  }
 }
 
 function destroyStorage(vpsId, basePath) {
